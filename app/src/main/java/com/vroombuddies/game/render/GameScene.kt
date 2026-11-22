@@ -10,6 +10,7 @@ import kotlin.random.Random
 /** Sounds the scene asks for; implemented by the audio layer. */
 interface SoundSink {
     fun engine(speed: Float, boost: Boolean) {}
+    fun tires(slide: Float, onGround: Boolean) {}
     fun play(name: String, strength: Float = 1f) {}
 }
 
@@ -320,7 +321,7 @@ class GameScene(
         val cr = camera.getLeftVector(FloatArray(3)); val cu = camera.getUpVector(FloatArray(3))
         add.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         alpha.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
-        sound.engine(pv.speed, pv.boosting)
+        sound.engine(pv.speed, pv.boosting); sound.tires(abs(pv.vl), pv.onGround)
 
         // HUD
         hud.place = race.player.place; hud.lap = race.lap; hud.energy = pv.energy

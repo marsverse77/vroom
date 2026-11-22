@@ -182,6 +182,9 @@ object Menus {
         option("Foliage wind", onOff, { s.foliageWind }, { s.foliageWind = it }, ::b)
         option("Fog", onOff, { s.fog }, { s.fog = it }, ::b)
         option("Dynamic resolution", onOff, { s.dynamicResolution }, { s.dynamicResolution = it }, ::b)
+        val audio = com.vroombuddies.game.audio.AudioSettings.of(ctx); val vols = com.vroombuddies.game.audio.Volume.values().toList()
+        option("Music", vols, { audio.music }, { audio.music = it }) { it.label }
+        option("Sound effects", vols, { audio.effects }, { audio.effects = it }) { it.label }
         option("Frame rate (V-Sync)", listOf(60, 30), { s.targetFps }, { s.targetFps = it }) { "$it fps" }
         val sc = ScrollView(ctx); sc.addView(list)
         root.addView(sc, Ui.lp(-2, -1, Gravity.CENTER_HORIZONTAL, t = 100f, b = 10f))

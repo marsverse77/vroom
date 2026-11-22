@@ -37,7 +37,7 @@ class GameActivity : Activity(), MenuHost {
     private var swapChain: SwapChain? = null
     private lateinit var mats: MaterialLib
     override lateinit var settings: GraphicsSettings
-    private val sound by lazy { Sound() }
+    private val sound by lazy { Sound(this) }
 
     private var showroom: Showroom? = null
     private var game: GameScene? = null
@@ -110,6 +110,7 @@ class GameActivity : Activity(), MenuHost {
     // ------------------------------------------------------------- menus
     private fun ensureShowroom() {
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
+        sound.menuMusic()
         if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings).also { it.setAspect(aspect) }
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
@@ -134,7 +135,7 @@ class GameActivity : Activity(), MenuHost {
             game?.destroy()
             settings.apply(view, renderer)
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
-            sound.engineOn = true
+            sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
             showHud()
         }, 120)
@@ -155,10 +156,10 @@ class GameActivity : Activity(), MenuHost {
 
     private fun pause() {
         if (paused || game == null) return
-        paused = true
+        paused = true; sound.setPaused(true)
         val box = Ui.col(this)
         box.addView(Ui.text(this, "Paused", 56f))
-        box.addView(Ui.button(this, "▶  Keep racing", Ui.GREEN, 30f) { click(); paused = false; overlay.removeView(box.parent as android.view.View) })
+        box.addView(Ui.button(this, "▶  Keep racing", Ui.GREEN, 30f) { click(); paused = false; sound.setPaused(false); overlay.removeView(box.parent as android.view.View) })
         box.addView(Ui.button(this, "🔁  Start again", Ui.BLUE, 26f) { click(); startRace(themeIndex) })
         box.addView(Ui.button(this, "🏠  Home", Ui.ORANGE, 26f) { click(); paused = false; toTitle() })
         val shade = Ui.frame(this).apply { setBackgroundColor(0x88000000.toInt()); addView(box, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)) }
