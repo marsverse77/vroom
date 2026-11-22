@@ -53,8 +53,11 @@ written as small classes in `render/fx/` and hooked into `GameScene` with one li
 
 ### 4. Effects and graphics
 - Owns `render/Particles.kt`, `render/GraphicsSettings.kt`, `render/Environment.kt` and new `render/fx/` files that aren't theme-specific.
-- Missing from the feature list: real volumetric god rays (currently bloom + flare only), true motion blur
-  (currently speed streaks), and water reflections. Confetti and fireworks already exist.
+- `render/fx/PostFx.kt` + `FxShaders.kt`: a full-screen pass after Filament's own effects, for radial motion blur,
+  screen-space god rays and the boost warp. `GameScene.post` holds its inputs. It's bypassed when nothing is on.
+- `render/fx/Water.kt`: the sea around themes that set `Theme.water` (glossy ripples, shore foam). Batches can tune it with `setLook`.
+- `render/fx/BoostTrails.kt`: light-trail ribbons from boosting cars. `render/fx/JumpCam.kt`: the cinematic jump shots.
+- Effects shaders are optional: if one fails to build on a phone, only that effect is switched off.
 
 ### 5. Audio
 - Owns `audio/`: richer engine sound, per-theme music loops (synthesised or original), and a jingle on the menu.

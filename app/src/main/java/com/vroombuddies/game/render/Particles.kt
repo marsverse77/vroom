@@ -73,6 +73,17 @@ class Particles(private val engine: Engine, scene: Scene, material: Material, pr
         }
     }
 
+    /** Flat ring of particles flying outward along the ground (boost shockwave, landing dust). */
+    fun ring(n: Int, x: Float, y: Float, z: Float, speed: Float, life: Float, s0: Float, s1: Float, r: Float, g: Float, b: Float, a: Float, up: Float = 0.5f, stretch: Float = 0f, gravity: Float = 0f) {
+        val off = rnd.nextFloat() * 6.283f
+        for (i in 0 until n) {
+            val th = off + i * 6.283f / n
+            val sp = speed * (0.85f + rnd.nextFloat() * 0.3f)
+            spawn(x + cos(th) * 0.6f, y, z + sin(th) * 0.6f, cos(th) * sp, up * (0.5f + rnd.nextFloat()), sin(th) * sp,
+                life * (0.8f + rnd.nextFloat() * 0.4f), s0, s1, r, g, b, a, gravity, 2.2f, stretch)
+        }
+    }
+
     fun clear() { for (i in 0 until max) life[i] = 0f }
 
     /** Simulate and rebuild the quads. cam* = camera position, right and up vectors. */

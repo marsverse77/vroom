@@ -13,6 +13,7 @@ import com.google.android.filament.utils.Utils
 import com.vroombuddies.game.audio.Sound
 import com.vroombuddies.game.content.Themes
 import com.vroombuddies.game.render.*
+import com.vroombuddies.game.render.fx.PostFx
 import com.vroombuddies.game.sim.RacePhase
 import com.vroombuddies.game.ui.*
 import kotlin.concurrent.thread
@@ -36,6 +37,8 @@ class GameActivity : Activity(), MenuHost {
     private lateinit var camera: Camera
     private var swapChain: SwapChain? = null
     private lateinit var mats: MaterialLib
+    private var postFx: PostFx? = null
+    private var surfaceW = 0; private var surfaceH = 0
     override lateinit var settings: GraphicsSettings
     private val sound by lazy { Sound() }
 
@@ -94,6 +97,7 @@ class GameActivity : Activity(), MenuHost {
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
                 mats.create(engine, pkgs)
+                postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
                 toTitle()
             }
@@ -221,7 +225,7 @@ class GameActivity : Activity(), MenuHost {
             } else showroom?.update(dt)
             val sc = swapChain ?: return
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
-                renderer.render(view)
+                postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 renderer.endFrame()
             }
         }
@@ -241,6 +245,7 @@ class GameActivity : Activity(), MenuHost {
         super.onDestroy()
         choreographer.removeFrameCallback(frameCallback)
         game?.destroy(); showroom?.destroy()
+        postFx?.destroy(view)
         uiHelper.detach()
         engine.destroyRenderer(renderer); engine.destroyView(view); engine.destroyScene(scene)
         engine.destroyCameraComponent(camera.entity)
@@ -261,6 +266,7 @@ class GameActivity : Activity(), MenuHost {
         override fun onResized(width: Int, height: Int) {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
+            surfaceW = width; surfaceH = height; postFx?.resize(width, height)
             game?.setAspect(aspect); showroom?.setAspect(aspect)
         }
     }
