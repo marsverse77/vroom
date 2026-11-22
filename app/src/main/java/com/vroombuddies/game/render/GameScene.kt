@@ -235,6 +235,7 @@ class GameScene(
         val v = race.playerVehicle
         carPose(v, tmpP, tmpF)
         val boostOn = v.boosting
+        HotFx.update(theme, dt, eye, look, add, alpha, rnd)
         // boost: hot sparks from the exhausts + glowing trail
         if (boostOn) repeat(3) {
             add.spawn(tmpP[0] - tmpF[0] * 2.4f, tmpP[1] + 0.5f, tmpP[2] - tmpF[2] * 2.4f,
