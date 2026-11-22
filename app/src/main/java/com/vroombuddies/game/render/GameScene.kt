@@ -234,6 +234,7 @@ class GameScene(
     private fun ambientFx(dt: Float) {
         val v = race.playerVehicle
         carPose(v, tmpP, tmpF)
+        SpaceFx.update(theme, add, eye, tmpF, dt, rnd)
         val boostOn = v.boosting
         // boost: hot sparks from the exhausts + glowing trail
         if (boostOn) repeat(3) {
