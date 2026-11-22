@@ -10,5 +10,6 @@ typealias SceneryPack = Map<String, (Int) -> SceneryModel>
 object ScenerySets {
     val packs: List<SceneryPack> = listOf(
         // DesertScenery.pack,
+        TropicsScenery.pack,
     )
 }

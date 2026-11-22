@@ -41,6 +41,7 @@ class GameScene(
     private val cars = ArrayList<CarInstance>()
     private val add = Particles(engine, scene, mats.particleAdd, 700)
     private val alpha = Particles(engine, scene, mats.particleAlpha, 500)
+    private val tropics = TropicsFx.create(engine, scene, mats, track, theme, settings.particleScale)
     val hud = HudState()
     private val rnd = Random(9)
     private var time = 0f
@@ -320,6 +321,7 @@ class GameScene(
         val cr = camera.getLeftVector(FloatArray(3)); val cu = camera.getUpVector(FloatArray(3))
         add.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         alpha.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
+        tropics?.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         sound.engine(pv.speed, pv.boosting)
 
         // HUD
@@ -338,6 +340,7 @@ class GameScene(
         cars.forEach { it.destroy() }
         knock.destroy(); scenery.destroy(); trackR.destroy(); env.destroy()
         add.destroy(scene); alpha.destroy(scene)
+        tropics?.destroy()
         grading?.let { view.colorGrading = null; engine.destroyColorGrading(it) }
     }
 }
