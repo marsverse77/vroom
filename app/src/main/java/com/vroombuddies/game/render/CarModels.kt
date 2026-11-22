@@ -2,6 +2,7 @@ package com.vroombuddies.game.render
 
 import com.google.android.filament.*
 import com.vroombuddies.game.sim.VehicleParams
+import com.vroombuddies.game.render.cars.*
 import kotlin.math.PI
 
 /** Geometry for one car design, split by material. Model space: +Z forward, +Y up, origin on the ground under the centre. */
@@ -96,18 +97,20 @@ object Zoomy : CarDesign {
 }
 
 object CarDesigns {
-    /** Add new car designs here (Bubbles, Chomper, Rocket, Scoot, Hopper...). */
-    val all: List<CarDesign> = listOf(Zoomy)
+    /** Every car in the picker, in order. Designs live in render/cars/. */
+    val all: List<CarDesign> = listOf(Zoomy, Bubbles, Stomper, Rocket, Scoot, Hopper, Bumble)
 }
 
 data class Paint(val name: String, val color: Int, val metallic: Float = 0.2f, val roughness: Float = 0.32f, val rainbow: Boolean = false)
 
 object Paints {
+    /** Two rows in the picker: bright colours first, then the fancy shiny ones. Keep the count even. */
     val all = listOf(
-        Paint("Cherry Red", 0xe8222e), Paint("Sunny Yellow", 0xffc61a), Paint("Ocean Blue", 0x1e6fff), Paint("Lime Green", 0x45d14a),
-        Paint("Bubblegum", 0xff5fb2), Paint("Grape", 0x8a3dff), Paint("Orange Pop", 0xff7a1a), Paint("Sky Blue", 0x37c8ff),
-        Paint("Mint", 0x2fe0b0), Paint("Snow White", 0xf4f6fa), Paint("Midnight", 0x1c2140), Paint("Shiny Gold", 0xffc23a, 1f, 0.25f),
-        Paint("Chrome", 0xe6ebf0, 1f, 0.08f), Paint("Rainbow", 0xffffff, rainbow = true),
+        Paint("Cherry Red", 0xe8222e), Paint("Orange Pop", 0xff7a1a), Paint("Sunny Yellow", 0xffc61a), Paint("Lime Green", 0x45d14a),
+        Paint("Mint", 0x2fe0b0), Paint("Sky Blue", 0x37c8ff), Paint("Ocean Blue", 0x1e6fff), Paint("Grape", 0x8a3dff),
+        Paint("Bubblegum", 0xff5fb2), Paint("Snow White", 0xf4f6fa), Paint("Midnight", 0x1c2140), Paint("Candy Apple", 0xd8103a, 0.85f, 0.18f),
+        Paint("Sparkle Pink", 0xff4fae, 0.8f, 0.2f), Paint("Shiny Gold", 0xffc23a, 1f, 0.25f), Paint("Chrome", 0xe6ebf0, 1f, 0.08f),
+        Paint("Rainbow", 0xffffff, rainbow = true),
     )
 }
 

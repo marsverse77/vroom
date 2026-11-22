@@ -84,7 +84,7 @@ object Menus {
         val grid = Ui.col(ctx)
         val paints = Paints.all
         val swatches = ArrayList<View>()
-        val perRow = 7
+        val perRow = (paints.size + 1) / 2
         var row: LinearLayout? = null
         paints.forEachIndexed { i, p ->
             if (i % perRow == 0) { row = Ui.row(ctx); grid.addView(row) }
