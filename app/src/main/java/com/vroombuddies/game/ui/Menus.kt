@@ -91,12 +91,13 @@ object Menus {
             val sw = Swatch(ctx, p, i == current)
             sw.setOnClickListener { host.click(); swatches.forEach { (it as Swatch).picked = false; it.invalidate() }; sw.picked = true; Ui.popIn(sw); host.pickPaint(i) }
             swatches.add(sw)
-            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(74f), Ui.dpi(74f)).apply { setMargins(Ui.dpi(6f), Ui.dpi(6f), Ui.dpi(6f), Ui.dpi(6f)) })
+            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(64f), Ui.dpi(64f)).apply { setMargins(Ui.dpi(5f), Ui.dpi(5f), Ui.dpi(5f), Ui.dpi(5f)) })
             Ui.popIn(sw, 30L * i)
         }
-        val bottom = Ui.col(ctx)
+        // swatches and the go button share one row along the bottom so the car stays visible above them
+        val bottom = Ui.row(ctx)
         bottom.addView(grid)
-        bottom.addView(Ui.button(ctx, "✔  Let's race!", Ui.GREEN, 30f) { host.click(); host.toTrackPicker() }, lp(t = 8f))
+        bottom.addView(Ui.button(ctx, "✔  Go!", Ui.GREEN, 30f) { host.click(); host.toTrackPicker() }, lp(l = 16f))
         root.addView(bottom, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 14f))
         return root
     }
@@ -108,6 +109,7 @@ object Menus {
             val r = width / 2f - Ui.dp(6f)
             p.style = android.graphics.Paint.Style.FILL
             p.color = 0x55000000; c.drawCircle(width / 2f, height / 2f + Ui.dp(4f), r, p)
+            p.color = Color.BLACK // opaque again: the shader is drawn with the paint's alpha
             p.shader = when {
                 paint.rainbow -> SweepGradient(width / 2f, height / 2f, intArrayOf(0xffff1744.toInt(), 0xffffea00.toInt(), 0xff00e676.toInt(), 0xff2979ff.toInt(), 0xffd500f9.toInt(), 0xffff1744.toInt()), null)
                 paint.metallic > 0.5f -> LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), intArrayOf(Color.WHITE, paint.color or 0xff000000.toInt(), Ui.lighten(paint.color or 0xff000000.toInt(), 0.6f)), null, Shader.TileMode.CLAMP)
