@@ -50,6 +50,9 @@ written as small classes in `render/fx/` and hooked into `GameScene` with one li
 ### 3. UI and menus
 - Owns `ui/` and the screen flow in `GameActivity`. Ideas: an animated title, car names and stats, a track map preview,
   a bigger win celebration, and a parent-only settings gate.
+- Reusable animated views (speed lines, sunburst, confetti, track map, hold-to-open button) live in `ui/Fx.kt`.
+- To add a graphics option to the settings menu, add one `option(label, hint, values, get, set, name)` line under the
+  right `section(...)` in `Menus.settings`, and set it in `Menus.applyPreset` if a preset should change it.
 
 ### 4. Effects and graphics
 - Owns `render/Particles.kt`, `render/GraphicsSettings.kt`, `render/Environment.kt` and new `render/fx/` files that aren't theme-specific.

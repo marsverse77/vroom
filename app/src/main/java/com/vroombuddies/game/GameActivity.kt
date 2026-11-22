@@ -105,7 +105,14 @@ class GameActivity : Activity(), MenuHost {
             or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
     }
 
-    private fun setScreen(v: android.view.View) { overlay.removeAllViews(); overlay.addView(v, FrameLayout.LayoutParams(-1, -1)); hud = null; left = null; right = null; boostBtn = null }
+    private fun setScreen(v: android.view.View, swoosh: Boolean = true) {
+        overlay.removeAllViews(); overlay.addView(v, FrameLayout.LayoutParams(-1, -1)); hud = null; left = null; right = null; boostBtn = null
+        if (swoosh) {
+            // quick slide in from the right: every screen change feels zippy
+            v.translationX = Ui.dp(90f); v.alpha = 0f
+            v.animate().translationX(0f).alpha(1f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        }
+    }
 
     // ------------------------------------------------------------- menus
     private fun ensureShowroom() {
@@ -142,14 +149,14 @@ class GameActivity : Activity(), MenuHost {
 
     private fun showHud() {
         val root = Ui.frame(this)
-        val h = HudOverlay(this); root.addView(h, FrameLayout.LayoutParams(-1, -1)); hud = h
+        val h = HudOverlay(this).also { it.track = game?.track }; root.addView(h, FrameLayout.LayoutParams(-1, -1)); hud = h
         val l = SteerButton(this, -1); val r = SteerButton(this, 1)
-        root.addView(l, Ui.lp(Ui.dpi(130f), Ui.dpi(130f), Gravity.BOTTOM or Gravity.START, l = 18f, b = 18f))
-        root.addView(r, Ui.lp(Ui.dpi(130f), Ui.dpi(130f), Gravity.BOTTOM or Gravity.START, l = 160f, b = 18f))
+        root.addView(l, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 16f, b = 16f))
+        root.addView(r, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 168f, b = 16f))
         val b = BoostButton(this)
         root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
         root.addView(Ui.button(this, "⏸", Ui.PURPLE, 22f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 70f))
-        setScreen(root)
+        setScreen(root, swoosh = false)
         hud = h; left = l; right = r; boostBtn = b
     }
 
@@ -172,7 +179,7 @@ class GameActivity : Activity(), MenuHost {
         if (stars > prefs.getInt("stars$themeIndex", 0)) prefs.edit().putInt("stars$themeIndex", stars).apply()
         overlay.postDelayed({
             if (game == null) return@postDelayed
-            overlay.addView(ResultView(this, place,
+            overlay.addView(ResultView(this, place, stars, { sound.play(it) },
                 onAgain = { click(); startRace(themeIndex) },
                 onNext = { click(); startRace((themeIndex + 1) % Themes.all.size) },
                 onHome = { click(); toTitle() }), FrameLayout.LayoutParams(-1, -1))
