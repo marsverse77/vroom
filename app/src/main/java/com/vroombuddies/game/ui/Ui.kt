@@ -70,8 +70,13 @@ object Ui {
     }
 
     fun frame(ctx: Context) = FrameLayout(ctx).apply { layoutParams = ViewGroup.LayoutParams(-1, -1) }
-    fun row(ctx: Context) = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-    fun col(ctx: Context) = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+    /** Linear layout whose children wrap their content by default (Android's default is match-parent across,
+     *  which clips wide children to the narrowest sibling inside a wrap-content parent). */
+    private class Lin(ctx: Context) : LinearLayout(ctx) {
+        override fun generateDefaultLayoutParams() = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+    }
+    fun row(ctx: Context): LinearLayout = Lin(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+    fun col(ctx: Context): LinearLayout = Lin(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
     fun lp(w: Int, h: Int, gravity: Int, l: Float = 0f, t: Float = 0f, r: Float = 0f, b: Float = 0f) =
         FrameLayout.LayoutParams(w, h, gravity).apply { setMargins(dpi(l), dpi(t), dpi(r), dpi(b)) }
 }

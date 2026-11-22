@@ -71,7 +71,7 @@ class SunburstView(ctx: Context, private val c1: Int, private val c2: Int, priva
             c.drawPath(path, p)
         }
         c.restore()
-        p.shader = glow; c.drawCircle(cx, cy, r, p); p.shader = null
+        p.color = Color.BLACK; p.shader = glow; c.drawCircle(cx, cy, r, p); p.shader = null
     }
 }
 
@@ -168,7 +168,7 @@ class TrackMapView(ctx: Context, shape: TrackShape, private val road: Int) : Vie
     private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val path = Path()
     override fun onDraw(c: Canvas) {
         val s = min(width, height).toFloat()
-        TrackMaps.drawOutline(c, map, (width - s) / 2, (height - s) / 2, s, p, path, road, Ui.INK, Ui.dp(5f))
+        TrackMaps.drawOutline(c, map, (width - s) / 2, (height - s) / 2, s, p, path, road, Color.WHITE, Ui.dp(5f))
     }
 }
 

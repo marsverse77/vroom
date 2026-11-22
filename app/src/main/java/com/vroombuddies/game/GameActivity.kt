@@ -121,10 +121,10 @@ class GameActivity : Activity(), MenuHost {
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
-    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0.35f; setScreen(Menus.title(this, this)) }
-    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.carPicker(this, this, carIndex)) }
-    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
-    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.trackPicker(this, this)) }
+    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0.35f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
+    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.carPicker(this, this, carIndex)) }
+    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
+    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
@@ -155,7 +155,7 @@ class GameActivity : Activity(), MenuHost {
         root.addView(r, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 168f, b = 16f))
         val b = BoostButton(this)
         root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
-        root.addView(Ui.button(this, "⏸", Ui.PURPLE, 22f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 70f))
+        root.addView(Ui.button(this, "⏸", Ui.PURPLE, 22f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
         setScreen(root, swoosh = false)
         hud = h; left = l; right = r; boostBtn = b
     }

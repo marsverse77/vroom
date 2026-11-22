@@ -131,18 +131,16 @@ object SceneryLibrary {
  * Places a theme's scenery around the track and batches it into static meshes per 300 m cell,
  * each with a detailed (near) and a simple (far) version: level of detail switching per frame.
  */
-class Scenery(private val engine: Engine, private val scene: Scene, private val mats: MaterialLib, private val track: TrackPath, private val theme: Theme) {
-    private class Cell(val cx: Float, val cz: Float) {
+/**
+ * Where every scenery model goes, batched per 300 m cell into near (detailed) and far (simple) meshes.
+ * Pure geometry with no GPU calls. [missing] lists ids that have no builder yet.
+ */
+class SceneryLayout(private val track: TrackPath, private val theme: Theme, val cellSize: Float = 300f) {
+    class Cell(val cx: Float, val cz: Float) {
         val near = MeshData(); val far = MeshData(); val glow = MeshData()
-        var eNear = 0; var eFar = 0; var eGlow = 0
     }
-    private val cells = HashMap<Long, Cell>()
-    private val meshes = ArrayList<GpuMesh>()
-    private val ents = ArrayList<Int>()
-    private val cellSize = 300f
-    private lateinit var litMi: MaterialInstance
-    private lateinit var glowMi: MaterialInstance
-    var missing = ArrayList<String>()
+    val cells = HashMap<Long, Cell>()
+    val missing = ArrayList<String>()
 
     private fun cellOf(x: Float, z: Float): Cell {
         val ix = floor(x / cellSize).toInt(); val iz = floor(z / cellSize).toInt()
@@ -150,7 +148,7 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
         return cells.getOrPut(key) { Cell((ix + 0.5f) * cellSize, (iz + 0.5f) * cellSize) }
     }
 
-    fun build(windOn: Boolean) {
+    fun place(): SceneryLayout {
         val rng = Rng(theme.shape.seed * 31 + 7)
         // coarse copy of the centre line for distance tests
         val pts = ArrayList<FloatArray>()
@@ -191,15 +189,32 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
                 placed++
             }
         }
+        return this
+    }
+}
+
+class Scenery(private val engine: Engine, private val scene: Scene, private val mats: MaterialLib, private val track: TrackPath, private val theme: Theme) {
+    private class CellEnts(val cell: SceneryLayout.Cell) { var eNear = 0; var eFar = 0; var eGlow = 0 }
+    private val cells = ArrayList<CellEnts>()
+    private val meshes = ArrayList<GpuMesh>()
+    private val ents = ArrayList<Int>()
+    private lateinit var litMi: MaterialInstance
+    private lateinit var glowMi: MaterialInstance
+    var missing: List<String> = emptyList()
+
+    fun build(windOn: Boolean) {
+        val layout = SceneryLayout(track, theme).place()
+        missing = layout.missing
         litMi = mats.lit.createInstance().also {
             it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.8f); it.setParameter("metallic", 0f)
             it.setParameter("emissive", 0f, 0f, 0f, 0f); it.setParameter("wind", if (windOn) 1f else 0f)
         }
         glowMi = mats.glow.createInstance().also { it.setParameter("color", 3f, 3f, 3f, 1f) }
-        for (c in cells.values) {
-            if (c.near.vCount > 0) c.eNear = make(c.near, litMi, true)
-            if (c.far.vCount > 0) c.eFar = make(c.far, litMi, false)
-            if (c.glow.vCount > 0) c.eGlow = make(c.glow, glowMi, false)
+        for (cell in layout.cells.values) {
+            val c = CellEnts(cell); cells.add(c)
+            if (cell.near.vCount > 0) c.eNear = make(cell.near, litMi, true)
+            if (cell.far.vCount > 0) c.eFar = make(cell.far, litMi, false)
+            if (cell.glow.vCount > 0) c.eGlow = make(cell.glow, glowMi, false)
         }
     }
 
@@ -215,8 +230,8 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
     /** Level of detail: near cells use the detailed batch, far cells the simple one. */
     fun updateLod(camX: Float, camZ: Float) {
         val rm = engine.renderableManager
-        for (c in cells.values) {
-            val d = hypot(c.cx - camX, c.cz - camZ)
+        for (c in cells) {
+            val d = hypot(c.cell.cx - camX, c.cell.cz - camZ)
             val near = d < 520f
             if (c.eNear != 0) rm.setLayerMask(rm.getInstance(c.eNear), 0xff, if (near) 0xff else 0)
             if (c.eFar != 0) rm.setLayerMask(rm.getInstance(c.eFar), 0xff, if (near) 0 else 0xff)

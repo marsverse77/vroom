@@ -20,6 +20,8 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
     var paint: Paint = Paints.all[0]; private set
     /** Shift the car sideways on screen (menus put buttons on one side). */
     var offsetX = 0f
+    /** Shift the car up on screen (pickers keep their buttons along the bottom). */
+    var offsetY = 0f
 
     init {
         env.build(settings.shadowMapSize, settings.shadowCascades)
@@ -74,7 +76,7 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         car?.update(Mat.trs(0f, hop, 0f, 0f, a, 0f), 0f, 0f, 0f, sin(t) * 0.3f, t * 4f, 0f, t, false)
         val ex = 8.5f; val ey = 3.2f; val ez = 8.5f
         camera.setProjection(38.0, aspect.toDouble(), 0.3, 3000.0, Camera.Fov.VERTICAL)
-        camera.setShift(offsetX.toDouble(), 0.0)
+        camera.setShift(offsetX.toDouble(), offsetY.toDouble())
         camera.lookAt(ex.toDouble(), ey.toDouble(), ez.toDouble(), 0.0, 1.0, 0.0, 0.0, 1.0, 0.0)
         env.follow(ex, ey, ez)
         settings.setDof(view, false, 12f, camera)

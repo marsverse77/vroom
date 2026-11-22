@@ -98,7 +98,7 @@ object Menus {
         fun step(d: Int) { host.click(); idx = (idx + d + designs.size) % designs.size; show(d) }
         root.addView(Ui.button(ctx, "◀", Ui.BLUE, 44f) { step(-1) }, Ui.lp(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL, l = 28f))
         root.addView(Ui.button(ctx, "▶", Ui.BLUE, 44f) { step(1) }, Ui.lp(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL, r = 28f))
-        root.addView(stats, Ui.lp(Ui.dpi(210f), Ui.dpi(120f), Gravity.END or Gravity.TOP, t = 96f, r = 24f))
+        root.addView(stats, Ui.lp(Ui.dpi(230f), Ui.dpi(104f), Gravity.START or Gravity.BOTTOM, l = 20f, b = 18f))
         Ui.popIn(stats, 200)
         // Swipe anywhere on the car to flip through them too.
         var downX = 0f
@@ -123,7 +123,7 @@ object Menus {
         private val txt = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { typeface = Ui.font; color = Color.WHITE }
         private val base = VehicleParams()
         private val values = IntArray(3); private val shown = FloatArray(3)
-        private val labels = arrayOf("⚡", "🛞", "🚀"); private val colors = intArrayOf(Ui.ORANGE, Ui.GREEN, Ui.PINK)
+        private val labels = arrayOf("SPEED", "GRIP", "BOOST"); private val colors = intArrayOf(Ui.ORANGE, Ui.GREEN, Ui.PINK)
         private fun pips(v: Float, b: Float) = (3 + (v / b - 1f) * 20f).roundToInt().coerceIn(1, 5)
         fun set(v: VehicleParams) {
             values[0] = pips(v.topSpeed, base.topSpeed); values[1] = pips(v.grip, base.grip); values[2] = pips(v.boostSpeed, base.boostSpeed)
@@ -132,15 +132,15 @@ object Menus {
         override fun onDraw(c: Canvas) {
             var again = false
             p.color = 0x881d1b3a.toInt(); c.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), Ui.dp(22f), Ui.dp(22f), p)
-            val rowH = height / 3f; val pip = Ui.dp(22f); val gap = Ui.dp(6f)
-            txt.textSize = Ui.dp(22f)
+            val rowH = height / 3f; val pip = Ui.dp(20f); val gap = Ui.dp(6f)
+            txt.textSize = Ui.dp(15f)
             for (i in 0 until 3) {
                 shown[i] += (values[i] - shown[i]) * 0.25f
                 if (abs(values[i] - shown[i]) > 0.02f) again = true
                 val cy = rowH * (i + 0.5f)
-                c.drawText(labels[i], Ui.dp(12f), cy + Ui.dp(8f), txt)
+                c.drawText(labels[i], Ui.dp(12f), cy + Ui.dp(5f), txt)
                 for (k in 0 until 5) {
-                    val x = Ui.dp(52f) + k * (pip + gap)
+                    val x = Ui.dp(80f) + k * (pip + gap)
                     p.color = if (k < shown[i] - 0.01f) colors[i] else 0x44ffffff
                     c.drawRoundRect(x, cy - pip / 2, x + pip, cy + pip / 2, Ui.dp(6f), Ui.dp(6f), p)
                 }
@@ -175,12 +175,13 @@ object Menus {
             val sw = Swatch(ctx, p, i == current)
             sw.setOnClickListener { host.click(); swatches.forEach { (it as Swatch).picked = false; it.invalidate() }; sw.picked = true; Ui.popIn(sw); host.pickPaint(i) }
             swatches.add(sw)
-            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(74f), Ui.dpi(74f)).apply { setMargins(Ui.dpi(6f), Ui.dpi(6f), Ui.dpi(6f), Ui.dpi(6f)) })
+            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(64f), Ui.dpi(64f)).apply { setMargins(Ui.dpi(5f), Ui.dpi(5f), Ui.dpi(5f), Ui.dpi(5f)) })
             Ui.popIn(sw, 30L * i)
         }
-        val bottom = Ui.col(ctx)
+        // swatches and the go button share one row along the bottom so the car stays visible above them
+        val bottom = Ui.row(ctx)
         bottom.addView(grid)
-        bottom.addView(Ui.button(ctx, "✔  Let's race!", Ui.GREEN, 30f) { host.click(); host.toTrackPicker() }, lp(t = 8f))
+        bottom.addView(Ui.button(ctx, "✔  Go!", Ui.GREEN, 30f) { host.click(); host.toTrackPicker() }, lp(l = 16f))
         root.addView(bottom, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 14f))
         return root
     }
@@ -192,6 +193,7 @@ object Menus {
             val r = width / 2f - Ui.dp(6f)
             p.style = android.graphics.Paint.Style.FILL
             p.color = 0x55000000; c.drawCircle(width / 2f, height / 2f + Ui.dp(4f), r, p)
+            p.color = Color.BLACK // opaque again: the shader is drawn with the paint's alpha
             p.shader = when {
                 paint.rainbow -> SweepGradient(width / 2f, height / 2f, intArrayOf(0xffff1744.toInt(), 0xffffea00.toInt(), 0xff00e676.toInt(), 0xff2979ff.toInt(), 0xffd500f9.toInt(), 0xffff1744.toInt()), null)
                 paint.metallic > 0.5f -> LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), intArrayOf(Color.WHITE, paint.color or 0xff000000.toInt(), Ui.lighten(paint.color or 0xff000000.toInt(), 0.6f)), null, Shader.TileMode.CLAMP)

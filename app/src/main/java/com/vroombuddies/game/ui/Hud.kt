@@ -33,7 +33,7 @@ class SteerButton(ctx: Context, private val dir: Int) : View(ctx) {
     override fun onDraw(c: Canvas) {
         val w = width.toFloat(); val h = height.toFloat(); val r = min(w, h) / 2 - Ui.dp(4f)
         p.style = Paint.Style.FILL
-        p.color = 0x55000000; c.drawCircle(w / 2, h / 2 + Ui.dp(5f), r, p)
+        p.color = 0x55000000; c.drawCircle(w / 2, h / 2 + Ui.dp(5f), r, p); p.color = Color.BLACK
         p.shader = RadialGradient(w / 2, h / 2 - r * 0.4f, r * 1.4f, if (held) 0xffffe14d.toInt() else 0xffffffff.toInt(), if (held) 0xffff9a1a.toInt() else 0xffb8d8ff.toInt(), Shader.TileMode.CLAMP)
         c.drawCircle(w / 2, h / 2, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(4f); p.color = Ui.INK; c.drawCircle(w / 2, h / 2, r, p)
@@ -70,7 +70,7 @@ class BoostButton(ctx: Context) : View(ctx) {
         val wob = if (ready && !boosting) sin(t * 8f) * Ui.dp(3f) else 0f
         p.style = Paint.Style.FILL
         if (ready) { p.color = 0x66ffb300; c.drawCircle(w / 2, h / 2, r + Ui.dp(8f) + abs(wob) * 2, p) }
-        p.color = 0x55000000; c.drawCircle(w / 2, h / 2 + Ui.dp(6f), r, p)
+        p.color = 0x55000000; c.drawCircle(w / 2, h / 2 + Ui.dp(6f), r, p); p.color = Color.BLACK
         val key = (if (ready) 1 else 0) + 2 * width + 100000 * height
         if (key != gradKey || grad == null) {
             gradKey = key
@@ -169,7 +169,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
     private fun drawMiniMap(c: Canvas, s: HudState, w: Float) {
         val tr = track ?: return
         val m = map ?: TrackMaps.of(tr).also { map = it }
-        val size = Ui.dp(120f); val l = w - size - Ui.dp(18f); val tp = Ui.dp(84f)
+        val size = Ui.dp(84f); val l = Ui.dp(28f); val tp = Ui.dp(128f) // under the place badge, above the steering pads
         p.style = Paint.Style.FILL; p.color = 0x661d1b3a
         c.drawRoundRect(l - Ui.dp(6f), tp - Ui.dp(6f), l + size + Ui.dp(6f), tp + size + Ui.dp(6f), Ui.dp(18f), Ui.dp(18f), p)
         TrackMaps.drawOutline(c, m, l, tp, size, p, mapPath, 0xffeeeeff.toInt(), Ui.INK, Ui.dp(4f))
@@ -222,7 +222,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
         // place badge
         val medal = when (s.place) { 1 -> 0xffffc61a.toInt(); 2 -> 0xffd6dde6.toInt(); 3 -> 0xffe0915a.toInt(); else -> 0xff7a8cff.toInt() }
         val bx = Ui.dp(70f); val by = Ui.dp(64f); val br = Ui.dp(50f)
-        p.color = 0x55000000; c.drawCircle(bx, by + Ui.dp(5f), br, p)
+        p.color = 0x55000000; c.drawCircle(bx, by + Ui.dp(5f), br, p); p.color = Color.BLACK
         p.color = medal; c.drawCircle(bx, by, br, p)
         p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(4f); p.color = Ui.INK; c.drawCircle(bx, by, br, p); p.style = Paint.Style.FILL
         outlined(c, ordinal(s.place), bx, by + Ui.dp(14f), Ui.dp(38f), Color.WHITE)
@@ -284,26 +284,26 @@ class ResultView(
         if (place <= 3) addView(SunburstView(ctx, if (win) 0x55ffd23f else 0x3340c4ff, if (win) 0x33ff7a1a else 0x222a7bff), LayoutParams(-1, -1).apply { gravity = Gravity.CENTER })
         val confetti = if (place <= 3) ConfettiView(ctx, if (win) 170 else 70) else null
         val col = Ui.col(ctx)
-        val trophy = Ui.text(ctx, when (place) { 1 -> "🏆"; 2 -> "🥈"; 3 -> "🥉"; else -> "⭐" }, 104f, outline = false)
+        val trophy = Ui.text(ctx, when (place) { 1 -> "🏆"; 2 -> "🥈"; 3 -> "🥉"; else -> "⭐" }, 64f, outline = false)
         col.addView(trophy)
         val titleText = if (win) "YOU WIN!" else "${place}${if (place == 2) "nd" else if (place == 3) "rd" else "th"} place!"
         val titleRow = Ui.row(ctx)
         val rainbow = intArrayOf(Ui.PINK, Ui.ORANGE, Ui.YELLOW, Ui.GREEN, Ui.BLUE, Ui.PURPLE)
         val letters = titleText.mapIndexed { i, ch ->
-            Ui.text(ctx, ch.toString(), 70f, if (win) rainbow[i % rainbow.size] else Color.WHITE).also { titleRow.addView(it) }
+            Ui.text(ctx, ch.toString(), 56f, if (win) rainbow[i % rainbow.size] else Color.WHITE).also { titleRow.addView(it) }
         }
         col.addView(titleRow)
         val starRow = Ui.row(ctx)
-        val starViews = (0 until 3).map { i -> Ui.text(ctx, "★", 64f, if (i < stars) Ui.YELLOW else 0x55ffffff).also { it.alpha = 0f; starRow.addView(it, android.widget.LinearLayout.LayoutParams(-2, -2).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) }) } }
+        val starViews = (0 until 3).map { i -> Ui.text(ctx, "★", 48f, if (i < stars) Ui.YELLOW else 0x55ffffff).also { it.alpha = 0f; starRow.addView(it, android.widget.LinearLayout.LayoutParams(-2, -2).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) }) } }
         col.addView(starRow)
         val sub = Ui.text(ctx, if (win) "Super speedy racing!" else "Great job! Let's try again!", 26f)
         col.addView(sub)
         val row = Ui.row(ctx)
-        fun lpb() = android.widget.LinearLayout.LayoutParams(-2, -2).apply { setMargins(Ui.dpi(14f), Ui.dpi(20f), Ui.dpi(14f), 0) }
-        row.addView(Ui.button(ctx, "🔁", Ui.BLUE, 40f, onAgain), lpb())
-        val next = Ui.button(ctx, "▶", Ui.GREEN, 48f, onNext)
+        fun lpb() = android.widget.LinearLayout.LayoutParams(-2, -2).apply { setMargins(Ui.dpi(14f), Ui.dpi(14f), Ui.dpi(14f), 0) }
+        row.addView(Ui.button(ctx, "🔁", Ui.BLUE, 34f, onAgain), lpb())
+        val next = Ui.button(ctx, "▶", Ui.GREEN, 36f, onNext)
         row.addView(next, lpb())
-        row.addView(Ui.button(ctx, "🏠", Ui.ORANGE, 40f, onHome), lpb())
+        row.addView(Ui.button(ctx, "🏠", Ui.ORANGE, 34f, onHome), lpb())
         col.addView(row)
         addView(col, LayoutParams(-2, -2, Gravity.CENTER))
         confetti?.let { addView(it, LayoutParams(-1, -1)) }
