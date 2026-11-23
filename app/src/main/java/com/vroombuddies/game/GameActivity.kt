@@ -59,6 +59,7 @@ class GameActivity : Activity(), MenuHost {
     private var keyLeft = false; private var keyRight = false; private var keyBoost = false
     private var lastNanos = 0L
     private var vsyncs = 0
+    private var loggedFrame = false
     private var frames = 0
 
     private fun followRefreshRate() {
@@ -290,11 +291,18 @@ class GameActivity : Activity(), MenuHost {
                     if (g.hud.phase == RacePhase.COUNTDOWN) countdownBeeps(g.hud.countdown)
                 }
                 hud?.tick(dt); boostBtn?.tick(dt)
-            } else showroom?.update(dt)
+            } else {
+                if (frames < 1200 && !loggedFrame) Log.i("Vroom", "first showroom update")
+                showroom?.update(dt)
+            }
             val sc = swapChain ?: return
+            if (!loggedFrame) Log.i("Vroom", "first beginFrame")
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
+                if (!loggedFrame) Log.i("Vroom", "first render")
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
+                if (!loggedFrame) Log.i("Vroom", "first endFrame")
                 renderer.endFrame()
+                loggedFrame = true
             }
         }
     }
