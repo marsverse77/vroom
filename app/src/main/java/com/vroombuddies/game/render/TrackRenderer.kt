@@ -2,22 +2,17 @@ package com.vroombuddies.game.render
 
 import com.google.android.filament.*
 import com.vroombuddies.game.content.Theme
-import com.vroombuddies.game.sim.Frame
 import com.vroombuddies.game.sim.TrackPath
 import kotlin.math.*
 
-/**
- * Builds every static piece of the race track: road, kerbs, walls, embankments or floating slab,
- * jump ramps, boost pads, start arch and the ground. Road pieces are cut into chunks so the
- * renderer can skip the parts behind the camera.
- */
+/** Uploads [TrackGeometry] to Filament with the right material for each layer. */
 class TrackRenderer(private val engine: Engine, private val scene: Scene, private val mats: MaterialLib, private val track: TrackPath, private val theme: Theme) {
     private val entities = ArrayList<Int>()
     private val meshes = ArrayList<GpuMesh>()
     private val textures = ArrayList<Texture>()
     private val instances = ArrayList<MaterialInstance>()
-    val wallHeight = 1.4f
-    private val wallThick = 0.8f
+    private val geometry = TrackGeometry(track, theme)
+    val wallHeight get() = geometry.wallHeight
 
     private fun add(m: MeshData, mi: MaterialInstance, shadows: Boolean = true, receive: Boolean = true) {
         if (m.vCount == 0) return
@@ -39,216 +34,36 @@ class TrackRenderer(private val engine: Engine, private val scene: Scene, privat
     }
 
     fun build() {
-        val hw = track.halfWidth
         val roadMi = texturedMi(Textures.road(engine, theme.road, theme.kerbs.first, theme.kerbs.second), 1f, 1f, 0.75f)
         val wallMi = texturedMi(Textures.wall(engine, theme.walls.first, theme.walls.second), 1f, 1f, 0.5f, if (theme.glowWalls) 1.6f else 0f)
         val g = theme.ground ?: (theme.skirt to theme.skirt)
         val skirtMi = texturedMi(Textures.ground(engine, g.first, g.second, 5), 1f, 1f, 0.95f, tint = Rgba.hex(theme.skirt).let { Rgba(1f, 1f, 1f) })
         val rampMi = texturedMi(Textures.ramp(engine), 1f, 1f, 0.45f, 0.15f)
 
-        val step = 4f
-        val chunk = 240f
-        val f = Frame(); val f2 = Frame()
-        var s0 = 0f
-        while (s0 < track.length - 0.01f) {
-            val s1 = min(track.length, s0 + chunk)
-            val road = MeshData(); val walls = MeshData(); val skirt = MeshData()
-            var s = s0
-            var prevRoad: IntArray? = null; var prevWall: Array<IntArray>? = null; var prevSkirt: Array<IntArray>? = null
-            while (true) {
-                track.frame(s, f)
-                val y = f.y
-                // tilted normal for hills: n = r x t3
-                val tl = sqrt(1 + f.slope * f.slope)
-                val t3x = f.tx / tl; val t3y = f.slope / tl; val t3z = f.tz / tl
-                val nx = 0f * t3z - 0f * t3y + (f.rz * t3y) * 0f + (-f.rz * t3y)
-                val ny = f.rz * t3x - f.rx * t3z
-                val nz = f.rx * t3y
-                val nl = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(1e-4f)
-                val v = s / (hw * 2)
-                val w = Rgba.WHITE
-                val l = road.vertex(f.x - f.rx * hw, y, f.z - f.rz * hw, nx / nl, ny / nl, nz / nl, w, 0f, v)
-                val r = road.vertex(f.x + f.rx * hw, y, f.z + f.rz * hw, nx / nl, ny / nl, nz / nl, w, 1f, v)
-                prevRoad?.let { road.quadFacing(it[0], it[1], r, l) }
-                prevRoad = intArrayOf(l, r)
-
-                // walls (both sides): inner face, top, outer face
-                val wv = s / 8f
-                val wallRow = Array(2) { IntArray(6) }
-                for ((k, side) in floatArrayOf(-1f, 1f).withIndex()) {
-                    val xi = side * hw; val xo = side * (hw + wallThick)
-                    val ix = f.x + f.rx * xi; val iz = f.z + f.rz * xi; val ox = f.x + f.rx * xo; val oz = f.z + f.rz * xo
-                    val inN = -side
-                    wallRow[k][0] = walls.vertex(ix, y - 0.2f, iz, f.rx * inN, 0f, f.rz * inN, w, wv, 1f)
-                    wallRow[k][1] = walls.vertex(ix, y + wallHeight, iz, f.rx * inN, 0f, f.rz * inN, w, wv, 0.05f)
-                    wallRow[k][2] = walls.vertex(ix, y + wallHeight, iz, 0f, 1f, 0f, w, wv, 0f)
-                    wallRow[k][3] = walls.vertex(ox, y + wallHeight, oz, 0f, 1f, 0f, w, wv, 0.1f)
-                    wallRow[k][4] = walls.vertex(ox, y + wallHeight, oz, f.rx * side, 0f, f.rz * side, w, wv, 0.05f)
-                    wallRow[k][5] = walls.vertex(ox, y - 0.2f, oz, f.rx * side, 0f, f.rz * side, w, wv, 1f)
-                    prevWall?.let { p ->
-                        walls.quadFacing(p[k][0], wallRow[k][0], wallRow[k][1], p[k][1])
-                        walls.quadFacing(p[k][2], wallRow[k][2], wallRow[k][3], p[k][3])
-                        walls.quadFacing(p[k][4], wallRow[k][4], wallRow[k][5], p[k][5])
-                    }
-                }
-                prevWall = wallRow
-
-                // embankment down to the ground, or a floating slab underside
-                val skirtRow = Array(2) { IntArray(2) }
-                for ((k, side) in floatArrayOf(-1f, 1f).withIndex()) {
-                    val xa = side * (hw + wallThick)
-                    val top = y - 0.2f
-                    if (theme.ground != null) {
-                        val drop = max(0.5f, top + 0.3f)
-                        val xb = side * (hw + wallThick + drop / 0.7f + 2f)
-                        // outward-and-up normal
-                        val sl = 0.7f
-                        val nnx = f.rx * side * sl; val nnz = f.rz * side * sl
-                        skirtRow[k][0] = skirt.vertex(f.x + f.rx * xa, top, f.z + f.rz * xa, nnx, 1f, nnz, w, xa / 20f, s / 20f)
-                        skirtRow[k][1] = skirt.vertex(f.x + f.rx * xb, -0.3f, f.z + f.rz * xb, nnx, 1f, nnz, w, xb / 20f, s / 20f)
-                    } else {
-                        skirtRow[k][0] = skirt.vertex(f.x + f.rx * xa, top, f.z + f.rz * xa, f.rx * side, 0f, f.rz * side, w, 0f, s / 20f)
-                        skirtRow[k][1] = skirt.vertex(f.x + f.rx * xa, top - 3f, f.z + f.rz * xa, f.rx * side, 0f, f.rz * side, w, 0.15f, s / 20f)
-                    }
-                    prevSkirt?.let { p -> skirt.quadFacing(p[k][0], skirtRow[k][0], skirtRow[k][1], p[k][1]) }
-                }
-                if (theme.ground == null) {
-                    // underside of the floating road
-                    val a = skirt.vertex(f.x - f.rx * (hw + wallThick), y - 3.2f, f.z - f.rz * (hw + wallThick), 0f, -1f, 0f, w, 0f, s / 20f)
-                    val b = skirt.vertex(f.x + f.rx * (hw + wallThick), y - 3.2f, f.z + f.rz * (hw + wallThick), 0f, -1f, 0f, w, 1f, s / 20f)
-                    prevSkirt?.let { p -> skirt.quadFacing(p[0][2.coerceAtMost(p[0].size - 1)], p[1][p[1].size - 1], b, a) }
-                    prevSkirt = arrayOf(intArrayOf(skirtRow[0][0], skirtRow[0][1], a), intArrayOf(skirtRow[1][0], skirtRow[1][1], b))
-                } else prevSkirt = skirtRow
-
-                if (s >= s1 - 0.001f) break
-                s = min(s1, s + step)
-            }
-            add(road, roadMi, shadows = false)
-            add(walls, wallMi)
-            add(skirt, skirtMi, shadows = false)
-            s0 = s1
-        }
-        buildRamps(rampMi)
-        buildPads()
-        buildStart(f2)
-        if (theme.ground != null) buildGround()
-    }
-
-    private fun buildRamps(mi: MaterialInstance) {
-        val hw = track.halfWidth - 0.4f
-        val f = Frame()
-        for (j in track.jumps) {
-            val m = MeshData()
-            var prev: IntArray? = null
-            val n = 12
-            for (i in 0..n) {
-                val s = j.s0 + j.length * i / n
-                track.frame(s, f)
-                val y = track.centreHeight(s) + track.rampHeight(s) + 0.04f
-                val v = i.toFloat() / n * 2
-                val w = Rgba.WHITE
-                val a = m.vertex(f.x - f.rx * hw, y, f.z - f.rz * hw, 0f, 1f, 0f, w, 0f, v)
-                val b = m.vertex(f.x + f.rx * hw, y, f.z + f.rz * hw, 0f, 1f, 0f, w, 2f, v)
-                prev?.let { m.quadFacing(it[0], it[1], b, a) }
-                prev = intArrayOf(a, b)
-            }
-            // front lip face and the two sides
-            track.frame(j.sEnd, f)
-            val yb = track.centreHeight(j.sEnd); val yt = yb + j.height + 0.04f
-            val c = Rgba.hex(0xd86a00)
-            val a = m.vertex(f.x - f.rx * hw, yt, f.z - f.rz * hw, f.tx, 0f, f.tz, c)
-            val b = m.vertex(f.x + f.rx * hw, yt, f.z + f.rz * hw, f.tx, 0f, f.tz, c)
-            val cc = m.vertex(f.x + f.rx * hw, yb, f.z + f.rz * hw, f.tx, 0f, f.tz, c)
-            val d = m.vertex(f.x - f.rx * hw, yb, f.z - f.rz * hw, f.tx, 0f, f.tz, c)
-            m.quadFacing(a, b, cc, d)
-            for (side in floatArrayOf(-1f, 1f)) {
-                var pTop = -1; var pBot = -1
-                for (i in 0..n) {
-                    val s = j.s0 + j.length * i / n
-                    track.frame(s, f)
-                    val y0 = track.centreHeight(s); val y1 = y0 + track.rampHeight(s) + 0.04f
-                    val px = f.x + f.rx * hw * side; val pz = f.z + f.rz * hw * side
-                    val top = m.vertex(px, y1, pz, f.rx * side, 0f, f.rz * side, c)
-                    val bot = m.vertex(px, y0, pz, f.rx * side, 0f, f.rz * side, c)
-                    if (pTop >= 0) m.quadFacing(pBot, bot, top, pTop)
-                    pTop = top; pBot = bot
-                }
-            }
-            add(m, mi)
-        }
-    }
-
-    private fun buildPads() {
-        val tex = Textures.chevrons(engine); textures.add(tex)
-        val mi = mats.glowTex.createInstance().also {
-            it.setParameter("tex", tex, Textures.sampler())
+        val padTex = Textures.chevrons(engine); textures.add(padTex)
+        val padMi = mats.glowTex.createInstance().also {
+            it.setParameter("tex", padTex, Textures.sampler())
             it.setParameter("color", 0.4f, 2.2f, 4.0f, 1f)
             it.setParameter("scroll", 1.6f)
             instances.add(it)
         }
-        val m = MeshData(); val f = Frame()
-        for (p in track.pads) {
-            val rows = 6
-            var prev: IntArray? = null
-            for (i in 0..rows) {
-                val s = p.s - p.halfLength + 2 * p.halfLength * i / rows
-                track.frame(s, f)
-                val y = track.groundHeight(s) + 0.07f
-                val x0 = p.x - p.halfWidth; val x1 = p.x + p.halfWidth
-                val v = i.toFloat() / rows * 2f
-                val a = m.vertex(f.x + f.rx * x0, y, f.z + f.rz * x0, 0f, 1f, 0f, Rgba.WHITE, 0f, v)
-                val b = m.vertex(f.x + f.rx * x1, y, f.z + f.rz * x1, 0f, 1f, 0f, Rgba.WHITE, 1f, v)
-                prev?.let { m.quadFacing(it[0], it[1], b, a) }
-                prev = intArrayOf(a, b)
+        val startMi = texturedMi(Textures.checker(engine), 1f, 1f, 0.6f)
+        val archMi = mats.lit.createInstance().also { it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.35f); it.setParameter("metallic", 0f); it.setParameter("emissive", 0f, 0f, 0f, 0f); it.setParameter("wind", 0f); instances.add(it) }
+        val archGlowMi = mats.glow.createInstance().also { it.setParameter("color", 4f, 4f, 4f, 1f); instances.add(it) }
+        val groundMi = theme.ground?.let { texturedMi(Textures.ground(engine, it.first, it.second, theme.shape.seed), 1f, 1f, 0.95f) }
+        geometry.build { m, layer ->
+            when (layer) {
+                TrackLayer.ROAD -> add(m, roadMi, shadows = false)
+                TrackLayer.WALL -> add(m, wallMi)
+                TrackLayer.SKIRT -> add(m, skirtMi, shadows = false)
+                TrackLayer.RAMP -> add(m, rampMi)
+                TrackLayer.PADS -> add(m, padMi, shadows = false, receive = false)
+                TrackLayer.START_LINE -> add(m, startMi, shadows = false)
+                TrackLayer.ARCH -> add(m, archMi)
+                TrackLayer.ARCH_GLOW -> add(m, archGlowMi, shadows = false)
+                TrackLayer.GROUND -> groundMi?.let { add(m, it, shadows = false) }
             }
         }
-        add(m, mi, shadows = false, receive = false)
-    }
-
-    private fun buildStart(f: Frame) {
-        track.frame(0f, f)
-        val hw = track.halfWidth
-        val chk = Textures.checker(engine)
-        val mi = texturedMi(chk, 1f, 1f, 0.6f)
-        val line = MeshData()
-        val y = track.groundHeight(0f) + 0.05f
-        val v0 = line.vertex(f.x - f.rx * hw - f.tx * 1.5f, y, f.z - f.rz * hw - f.tz * 1.5f, 0f, 1f, 0f, Rgba.WHITE, 0f, 0f)
-        val v1 = line.vertex(f.x + f.rx * hw - f.tx * 1.5f, y, f.z + f.rz * hw - f.tz * 1.5f, 0f, 1f, 0f, Rgba.WHITE, 8f, 0f)
-        val v2 = line.vertex(f.x + f.rx * hw + f.tx * 1.5f, y, f.z + f.rz * hw + f.tz * 1.5f, 0f, 1f, 0f, Rgba.WHITE, 8f, 1f)
-        val v3 = line.vertex(f.x - f.rx * hw + f.tx * 1.5f, y, f.z - f.rz * hw + f.tz * 1.5f, 0f, 1f, 0f, Rgba.WHITE, 0f, 1f)
-        line.quadFacing(v0, v1, v2, v3)
-        add(line, mi, shadows = false)
-
-        // arch: two chunky pillars and a banner
-        val arch = MeshData(); val glow = MeshData()
-        val yaw = atan2(f.tx, f.tz)
-        for (side in floatArrayOf(-1f, 1f)) {
-            val px = f.x + f.rx * (hw + 2f) * side; val pz = f.z + f.rz * (hw + 2f) * side
-            Prims.roundBox(arch, 2.2f, 11f, 2.2f, 0.5f, Rgba.hex(0xff3b3b), Mat.trs(px, y + 5.5f, pz, 0f, yaw))
-            Prims.sphere(arch, 1.6f, Rgba.hex(0xffd54a), Mat.trs(px, y + 11.6f, pz))
-        }
-        Prims.roundBox(arch, (hw + 2f) * 2 + 2f, 2.6f, 1.2f, 0.5f, Rgba.hex(0x2a6bff), Mat.trs(f.x, y + 9.5f, f.z, 0f, yaw + PI.toFloat() / 2))
-        Prims.box(glow, (hw + 2f) * 2, 0.35f, 1.3f, Rgba(1f, 0.9f, 0.3f), Mat.trs(f.x, y + 8.4f, f.z, 0f, yaw + PI.toFloat() / 2))
-        val litMi = mats.lit.createInstance().also { it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.35f); it.setParameter("metallic", 0f); it.setParameter("emissive", 0f, 0f, 0f, 0f); it.setParameter("wind", 0f); instances.add(it) }
-        add(arch, litMi)
-        val glowMi = mats.glow.createInstance().also { it.setParameter("color", 4f, 4f, 4f, 1f); instances.add(it) }
-        add(glow, glowMi, shadows = false)
-    }
-
-    private fun buildGround() {
-        val g = theme.ground!!
-        val tex = Textures.ground(engine, g.first, g.second, theme.shape.seed)
-        val mi = texturedMi(tex, 1f, 1f, 0.95f)
-        val m = MeshData()
-        // a grid (not one quad) so fog, shadows and precision behave over 8 km
-        val size = 8000f; val n = 16; val cell = size / n
-        for (j in 0 until n) for (i in 0 until n) {
-            val x = -size / 2 + i * cell + cell / 2; val z = -size / 2 + j * cell + cell / 2
-            Prims.plane(m, cell, cell, Rgba.WHITE, Mat.trs(x, 0f, z), cell / 40f, cell / 40f)
-        }
-        // shift uvs so tiles line up across cells
-        for (k in 0 until m.vCount) { m.uv[k * 2] = m.pos[k * 3] / 40f; m.uv[k * 2 + 1] = m.pos[k * 3 + 2] / 40f }
-        add(m, mi, shadows = false)
     }
 
     fun destroy() {

@@ -34,7 +34,7 @@ Each stream owns its own files and only touches a shared file to add one line.
 |---|---|---|
 | A Hot & dry | Desert Canyon, Sunset Highway, Volcano Run, Dino Valley | cactus, tumbleweed, mesa, billboard, lavaRock, volcano, fern, bigEgg |
 | B Space | Space Station, Moon Base, Galaxy Grand Prix, Crystal Canyon | asteroid, satellite, planet, dome, antenna, crystal, glowMushroom |
-| C Water & tropics | Sunny Beach, Jungle Jam, Pirate Cove, Bubble Reef | palm, umbrella, beachBall, sandcastle, chest, barrelProp, coral, kelp, fish |
+| C Water & tropics | Sunny Beach, Jungle Jam, Pirate Cove, Bubble Reef | palm, umbrella, beachBall, sandcastle, chest, barrelProp, coral, kelp, fish (also built: lifeguardTower, surfboards, beachHut, crab, starfish, sailboat, islet, jungleTree, bigLeaf, giantFlower, tikiTotem, jungleRuin, parrot, cannon, anchor, jollyFlag, lantern, pirateShip, anemone, clam, jellyfish, sunkenShip) |
 | D Cold & cozy | Snowy Peaks, Frozen Lake, Autumn Woods | snowPine, snowman, iceberg, penguin, igloo, autumnTree, pumpkin, hayBale |
 | E Fun town | Neon City, Sweet Treats, Toy Town, Rainbow Sky | building, lamp, neonSign, lollipop, candyCane, gumdrop, toyBlocks, toyBall, pencil, toyHouse, cloudPuff, rainbow |
 
@@ -50,14 +50,28 @@ written as small classes in `render/fx/` and hooked into `GameScene` with one li
 ### 3. UI and menus
 - Owns `ui/` and the screen flow in `GameActivity`. Ideas: an animated title, car names and stats, a track map preview,
   a bigger win celebration, and a parent-only settings gate.
+- Reusable animated views (speed lines, sunburst, confetti, track map, hold-to-open button) live in `ui/Fx.kt`.
+- To add a graphics option to the settings menu, add one `option(label, hint, values, get, set, name)` line under the
+  right `section(...)` in `Menus.settings`, and set it in `Menus.applyPreset` if a preset should change it.
 
 ### 4. Effects and graphics
 - Owns `render/Particles.kt`, `render/GraphicsSettings.kt`, `render/Environment.kt` and new `render/fx/` files that aren't theme-specific.
-- Missing from the feature list: real volumetric god rays (currently bloom + flare only), true motion blur
-  (currently speed streaks), and water reflections. Confetti and fireworks already exist.
+- `render/fx/PostFx.kt` + `FxShaders.kt`: a full-screen pass after Filament's own effects, for radial motion blur,
+  screen-space god rays and the boost warp. `GameScene.post` holds its inputs. It's bypassed when nothing is on.
+- `render/fx/Water.kt`: the sea around themes that set `Theme.water` (glossy ripples, shore foam). Batches can tune it with `setLook`.
+- `render/fx/BoostTrails.kt`: light-trail ribbons from boosting cars. `render/fx/JumpCam.kt`: the cinematic jump shots.
+- Effects shaders are optional: if one fails to build on a phone, only that effect is switched off.
 
 ### 5. Audio
-- Owns `audio/`: richer engine sound, per-theme music loops (synthesised or original), and a jingle on the menu.
+- Owns `audio/`. Everything is synthesised at runtime (no audio files, nothing licensed):
+  - `Dsp` oscillators/filters, `Instruments` (lead, bass, mallet, bell, pluck and drum voices), `Sfx` effect recipes.
+  - `Music`: a song recipe (`Style`) per theme in `Songs`, written out by `Composer` into a 16-bar loop and played by `MusicPlayer`.
+    A new theme gets a stable fallback song; give it its own `Style` line in `Songs.byTheme`.
+  - `EngineSound`: geared engine, turbo whine on boost, free revving in the air, tyre squeal, road rumble and wind.
+  - `Mixer` mixes it all (pure Kotlin); `Sound` streams it to `AudioTrack`; `AudioSettings` holds the music/effects volumes.
+- Flow: menu song on every menu screen, the track's song starts on "GO!", a fanfare then the victory song at the finish,
+  and the music goes soft and muffled while paused.
+- `AudioTest` renders every song and effect offline; set `VROOM_AUDIO_PREVIEW=<dir>` to write WAV previews.
 
 ## Testing
 No emulator is available in the cloud, so verify sim changes with `SimTest`. For rendering, install the APK on a real phone.

@@ -1,0 +1,125 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const q = new URLSearchParams(location.search);
+const shot = q.get('shot'); const W = +q.get('w'), H = +q.get('h');
+const D = './data/';
+const getJson = n => fetch(D + n + '.json').then(r => r.json());
+const getBin = f => fetch(D + f).then(r => r.arrayBuffer());
+const texLoader = new THREE.TextureLoader();
+const tex = n => new Promise(res => texLoader.load(D + 'tex_' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; res(t); }));
+
+async function geom(m) {
+  const buf = await getBin(m.file); const v = m.v;
+  const f = new Float32Array(buf, 0, v * 12);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(f.slice(0, v * 3), 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(f.slice(v * 3, v * 6), 3));
+  const c4 = f.slice(v * 6, v * 10), c3 = new Float32Array(v * 3);
+  for (let i = 0; i < v; i++) { c3[i * 3] = c4[i * 4]; c3[i * 3 + 1] = c4[i * 4 + 1]; c3[i * 3 + 2] = c4[i * 4 + 2]; }
+  g.setAttribute('color', new THREE.BufferAttribute(c3, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(f.slice(v * 10, v * 12), 2));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(buf, v * 48, m.i), 1));
+  return g;
+}
+
+const texCache = {};
+async function material(m) {
+  if (m.mat === 'track') {
+    const L = m.layer;
+    if (L === 'PADS') { const t = await tex('PADS'); return new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(0.4, 2.2, 4.0), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }); }
+    if (L === 'ARCH') return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35 });
+    if (L === 'ARCH_GLOW') return new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(4, 4, 4) });
+    const t = texCache[L] || (texCache[L] = await tex(L));
+    const rough = { ROAD: 0.75, WALL: 0.5, SKIRT: 0.95, RAMP: 0.45, START_LINE: 0.6, GROUND: 0.95 }[L] ?? 0.8;
+    return new THREE.MeshStandardMaterial({ map: t, vertexColors: true, roughness: rough });
+  }
+  if (m.mat === 'paint') {
+    const c = new THREE.Color(m.color[0], m.color[1], m.color[2]);
+    return new THREE.MeshPhysicalMaterial({ color: c, vertexColors: true, metalness: m.metallic, roughness: m.rough, clearcoat: 1, clearcoatRoughness: 0.08 });
+  }
+  if (m.mat === 'glow') return new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(m.k, m.k, m.k) });
+  return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: m.rough ?? 0.8, metalness: m.metallic ?? 0 });
+}
+
+async function addScene(scene, json) {
+  for (const m of json.meshes) {
+    const mesh = new THREE.Mesh(await geom(m), await material(m));
+    if (m.m) { mesh.matrixAutoUpdate = false; mesh.matrix.fromArray(m.m); }
+    const unlit = m.mat === 'glow' || m.layer === 'PADS' || m.layer === 'ARCH_GLOW';
+    mesh.castShadow = !unlit && !['ROAD', 'SKIRT', 'GROUND', 'START_LINE'].includes(m.layer);
+    mesh.receiveShadow = !unlit;
+    scene.add(mesh);
+  }
+}
+
+(async () => {
+  const isShow = shot.startsWith('showroom');
+  const env = await getJson(isShow ? 'showroom' : 'world');
+  const cam = await getJson(isShow ? 'showroom' : shot);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(W, H); renderer.setPixelRatio(1);
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.0;
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const C = a => new THREE.Color(a[0], a[1], a[2]);
+  // sky dome: same three-colour gradient as Environment.kt
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(2500, 48, 24), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: C(env.sky[0]) }, hor: { value: C(env.sky[1]) }, bot: { value: C(env.sky[2]) } },
+    vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 top,hor,bot; varying vec3 d; void main(){ float y=d.y; vec3 c = y>0.0 ? mix(hor,top,pow(y,0.6)) : mix(hor,bot,min(1.0,-y*4.0)); gl_FragColor=vec4(c,1.0); \n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}'
+  }));
+  scene.add(sky);
+  // image-based light from the sky (skylight)
+  const pm = new THREE.PMREMGenerator(renderer);
+  const skyScene = new THREE.Scene(); skyScene.add(sky.clone());
+  scene.environment = pm.fromScene(skyScene, 0.02, 0.1, 5000).texture;
+
+  scene.fog = new THREE.FogExp2(C(env.fog.color), env.fog.density);
+
+  await addScene(scene, isShow ? env : env);
+  if (!isShow) await addScene(scene, cam);
+  if (shot === 'showroom_car1') {
+    // swap in the second paint: drop the first car's meshes (those with a matrix) and add the other
+    const car1 = await getJson('showroom_car1');
+    scene.children.filter(o => o.isMesh && !o.matrixAutoUpdate).forEach(o => scene.remove(o));
+    await addScene(scene, car1);
+  }
+
+  const eye = new THREE.Vector3(...cam.eye), look = new THREE.Vector3(...cam.look);
+  const camera = new THREE.PerspectiveCamera(cam.fov, W / H, 0.3, 6000);
+  camera.position.copy(eye); camera.lookAt(look);
+  const shift = +(q.get('shift') || 0), shiftY = +(q.get('shifty') || 0);
+  if (shift || shiftY) camera.setViewOffset(W, H, -shift * W / 2, shiftY * H / 2, W, H);
+  sky.position.copy(eye);
+
+  // sun with soft shadows around the action
+  const el = env.sun.el, az = env.sun.az;
+  const dir = new THREE.Vector3(-Math.cos(el) * Math.cos(az), -Math.sin(el), -Math.cos(el) * Math.sin(az)).normalize();
+  const sun = new THREE.DirectionalLight(C(env.sun.color), env.sun.i * 0.9);
+  sun.position.copy(look).addScaledVector(dir, -300); sun.target.position.copy(look);
+  sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+  const S = isShow ? 20 : 70; Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 1, far: 800 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.shadow.radius = 4;
+  scene.add(sun, sun.target);
+
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 }));
+  composer.addPass(new RenderPass(scene, camera));
+  if (!q.get('noao')) { const ao = new GTAOPass(scene, camera, W, H); ao.blendIntensity = 0.8; composer.addPass(ao); }
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.35, 0.5, 0.95));
+  composer.addPass(new OutputPass());
+  composer.render();
+  window.DONE = true;
+})().catch(e => { window.ERR = String(e.stack || e); });
+</script></body></html>

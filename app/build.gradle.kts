@@ -29,6 +29,16 @@ android {
     }
 
     packaging { jniLibs { useLegacyPackaging = true } }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("robolectric.defaultRepositoryUrl", "https://maven-central.storage-download.googleapis.com/maven2")
+            // set ROBOLECTRIC_DEPS to a folder holding android-all-instrumented jars to run without downloads
+            // screenshot export (tools/preview) only runs when asked for
+            if (System.getenv("PREVIEW_DIR") == null) it.exclude("**/Preview*")
+            System.getenv("ROBOLECTRIC_DEPS")?.let { d -> it.systemProperty("robolectric.offline", "true"); it.systemProperty("robolectric.dependency.dir", d) }
+        }
+    }
 }
 
 dependencies {
@@ -36,6 +46,7 @@ dependencies {
     implementation("com.google.android.filament:filament-utils-android:$filamentVersion")
     implementation("com.google.android.filament:filamat-android:$filamentVersion")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

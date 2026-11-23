@@ -13,6 +13,7 @@ import com.google.android.filament.utils.Utils
 import com.vroombuddies.game.audio.Sound
 import com.vroombuddies.game.content.Themes
 import com.vroombuddies.game.render.*
+import com.vroombuddies.game.render.fx.PostFx
 import com.vroombuddies.game.sim.RacePhase
 import com.vroombuddies.game.ui.*
 import kotlin.concurrent.thread
@@ -36,8 +37,10 @@ class GameActivity : Activity(), MenuHost {
     private lateinit var camera: Camera
     private var swapChain: SwapChain? = null
     private lateinit var mats: MaterialLib
+    private var postFx: PostFx? = null
+    private var surfaceW = 0; private var surfaceH = 0
     override lateinit var settings: GraphicsSettings
-    private val sound by lazy { Sound() }
+    private val sound by lazy { Sound(this) }
 
     private var showroom: Showroom? = null
     private var game: GameScene? = null
@@ -59,7 +62,7 @@ class GameActivity : Activity(), MenuHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Ui.density = resources.displayMetrics.density
+        Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
         overlay = FrameLayout(this)
@@ -94,6 +97,7 @@ class GameActivity : Activity(), MenuHost {
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
                 mats.create(engine, pkgs)
+                postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
                 toTitle()
             }
@@ -105,19 +109,27 @@ class GameActivity : Activity(), MenuHost {
             or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
     }
 
-    private fun setScreen(v: android.view.View) { overlay.removeAllViews(); overlay.addView(v, FrameLayout.LayoutParams(-1, -1)); hud = null; left = null; right = null; boostBtn = null }
+    private fun setScreen(v: android.view.View, swoosh: Boolean = true) {
+        overlay.removeAllViews(); overlay.addView(v, FrameLayout.LayoutParams(-1, -1)); hud = null; left = null; right = null; boostBtn = null
+        if (swoosh) {
+            // quick slide in from the right: every screen change feels zippy
+            v.translationX = Ui.dp(90f); v.alpha = 0f
+            v.animate().translationX(0f).alpha(1f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        }
+    }
 
     // ------------------------------------------------------------- menus
     private fun ensureShowroom() {
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
+        sound.menuMusic()
         if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings).also { it.setAspect(aspect) }
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
-    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0.35f; setScreen(Menus.title(this, this)) }
-    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.carPicker(this, this, carIndex)) }
-    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
-    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; setScreen(Menus.trackPicker(this, this)) }
+    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0.35f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
+    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.carPicker(this, this, carIndex)) }
+    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
+    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
@@ -134,7 +146,7 @@ class GameActivity : Activity(), MenuHost {
             game?.destroy()
             settings.apply(view, renderer)
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
-            sound.engineOn = true
+            sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
             showHud()
         }, 120)
@@ -142,26 +154,25 @@ class GameActivity : Activity(), MenuHost {
 
     private fun showHud() {
         val root = Ui.frame(this)
-        val h = HudOverlay(this); root.addView(h, FrameLayout.LayoutParams(-1, -1)); hud = h
+        val h = HudOverlay(this).also { it.track = game?.track }; root.addView(h, FrameLayout.LayoutParams(-1, -1)); hud = h
         val l = SteerButton(this, -1); val r = SteerButton(this, 1)
-        root.addView(l, Ui.lp(Ui.dpi(130f), Ui.dpi(130f), Gravity.BOTTOM or Gravity.START, l = 18f, b = 18f))
-        root.addView(r, Ui.lp(Ui.dpi(130f), Ui.dpi(130f), Gravity.BOTTOM or Gravity.START, l = 160f, b = 18f))
+        root.addView(l, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 16f, b = 14f))
+        root.addView(r, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 150f, b = 14f))
         val b = BoostButton(this)
-        root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
-        root.addView(Ui.button(this, "⏸", Ui.PURPLE, 22f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 70f))
-        setScreen(root)
+        root.addView(b, Ui.lp(Ui.dpi(Ui.BOOST_SIZE), Ui.dpi(Ui.BOOST_SIZE), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
+        root.addView(Ui.roundButton(this, "⏸", Ui.STEEL, 24f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
+        setScreen(root, swoosh = false)
         hud = h; left = l; right = r; boostBtn = b
     }
 
     private fun pause() {
         if (paused || game == null) return
-        paused = true
-        val box = Ui.col(this)
-        box.addView(Ui.text(this, "Paused", 56f))
-        box.addView(Ui.button(this, "▶  Keep racing", Ui.GREEN, 30f) { click(); paused = false; overlay.removeView(box.parent as android.view.View) })
-        box.addView(Ui.button(this, "🔁  Start again", Ui.BLUE, 26f) { click(); startRace(themeIndex) })
-        box.addView(Ui.button(this, "🏠  Home", Ui.ORANGE, 26f) { click(); paused = false; toTitle() })
-        val shade = Ui.frame(this).apply { setBackgroundColor(0x88000000.toInt()); addView(box, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)) }
+        paused = true; sound.setPaused(true)
+        lateinit var shade: android.view.View
+        shade = Menus.pause(this,
+            onResume = { click(); paused = false; sound.setPaused(false); overlay.removeView(shade) },
+            onRestart = { click(); sound.setPaused(false); startRace(themeIndex) },
+            onHome = { click(); paused = false; sound.setPaused(false); toTitle() })
         overlay.addView(shade, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -172,7 +183,7 @@ class GameActivity : Activity(), MenuHost {
         if (stars > prefs.getInt("stars$themeIndex", 0)) prefs.edit().putInt("stars$themeIndex", stars).apply()
         overlay.postDelayed({
             if (game == null) return@postDelayed
-            overlay.addView(ResultView(this, place,
+            overlay.addView(ResultView(this, place, stars, { sound.play(it) },
                 onAgain = { click(); startRace(themeIndex) },
                 onNext = { click(); startRace((themeIndex + 1) % Themes.all.size) },
                 onHome = { click(); toTitle() }), FrameLayout.LayoutParams(-1, -1))
@@ -221,7 +232,7 @@ class GameActivity : Activity(), MenuHost {
             } else showroom?.update(dt)
             val sc = swapChain ?: return
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
-                renderer.render(view)
+                postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 renderer.endFrame()
             }
         }
@@ -241,6 +252,7 @@ class GameActivity : Activity(), MenuHost {
         super.onDestroy()
         choreographer.removeFrameCallback(frameCallback)
         game?.destroy(); showroom?.destroy()
+        postFx?.destroy(view)
         uiHelper.detach()
         engine.destroyRenderer(renderer); engine.destroyView(view); engine.destroyScene(scene)
         engine.destroyCameraComponent(camera.entity)
@@ -261,6 +273,7 @@ class GameActivity : Activity(), MenuHost {
         override fun onResized(width: Int, height: Int) {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
+            surfaceW = width; surfaceH = height; postFx?.resize(width, height)
             game?.setAspect(aspect); showroom?.setAspect(aspect)
         }
     }
