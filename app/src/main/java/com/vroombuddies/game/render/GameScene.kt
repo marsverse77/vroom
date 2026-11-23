@@ -3,6 +3,7 @@ package com.vroombuddies.game.render
 import com.google.android.filament.*
 import com.vroombuddies.game.content.Knock
 import com.vroombuddies.game.content.Theme
+import com.vroombuddies.game.render.fx.*
 import com.vroombuddies.game.sim.*
 import kotlin.math.*
 import kotlin.random.Random
@@ -43,6 +44,13 @@ class GameScene(
     private val alpha = Particles(engine, scene, mats.particleAlpha, 500)
     private val tropics = TropicsFx.create(engine, scene, mats, track, theme, settings.particleScale)
     private val weather = Weather.forTheme(engine, scene, mats, theme, settings.particleScale)
+    private val water = Water(engine, scene, mats, track, theme)
+    private val trails: BoostTrails
+    private val jumpCam = JumpCam()
+    /** Inputs for the full-screen effects pass (motion blur, god rays, boost warp); read by the activity each frame. */
+    val post = PostFxInputs()
+    private var boostKick = 0f
+    private var boostGlow = 0f
     val hud = HudState()
     private val rnd = Random(9)
     private var time = 0f
@@ -59,11 +67,19 @@ class GameScene(
         scenery.build(settings.foliageWind)
         knock = KnockRenderer(engine, scene, mats, race.props)
         var ai = 0
-        for (r in race.racers) {
+        trails = BoostTrails(engine, scene, mats.particleAdd, race.racers.size)
+        for ((i, r) in race.racers.withIndex()) {
+            val p = if (r.isPlayer) paint else aiPaints[ai % aiPaints.size]
             val inst = if (r.isPlayer) CarInstance(engine, scene, mats, design, paint, true)
             else CarInstance(engine, scene, mats, designs[(ai + 1) % designs.size], aiPaints[ai++ % aiPaints.size], false)
             cars.add(inst)
+            // trail colour: the paint, pushed bright so it blooms (rainbow cars get a magic magenta)
+            val c = if (p.rainbow) Rgba(1f, 0.2f, 0.9f) else Rgba.hex(p.color)
+            val m = max(c.r, max(c.g, c.b)).coerceAtLeast(0.05f)
+            trails.setColor(i, c.r / m * 2.2f + 0.3f, c.g / m * 2.2f + 0.3f, c.b / m * 2.2f + 0.3f)
         }
+        val sc = Rgba.hex(theme.sunColor)
+        post.rayColor[0] = sc.r; post.rayColor[1] = sc.g; post.rayColor[2] = sc.b
         add.scale = settings.particleScale; alpha.scale = settings.particleScale
         applyGrading()
         hud.laps = race.laps; hud.racers = race.racers.size
@@ -92,10 +108,36 @@ class GameScene(
     private val eye = FloatArray(3); private val look = FloatArray(3)
     private var fov = 62f
     private var shake = 0f
-    private var cineSide = 1f; private var cineKind = 0; private var cineTimer = 0f
+    private var cineTimer = 0f
     private var orbitAngle = 0f
     private var aspect = 1.8f
     private val fr = Frame()
+    private val camE = FloatArray(3); private val camL = FloatArray(3)
+    private var camRoll = 0f
+    private val proj = FloatArray(2)
+
+    /** Fill [post] for the full-screen pass: blur from speed, god rays from where the sun is on screen, boost warp. */
+    private fun updatePost(realDt: Float, v: Vehicle, px: Float, py: Float, pz: Float, dx: Float, dz: Float) {
+        val racing = camMode == CamMode.CHASE
+        val speedBlur = ((v.speed - 28f) / 40f).coerceIn(0f, 1f)
+        val wantBlur = if (settings.motionBlur && racing) speedBlur * 0.6f + (if (v.boosting) 0.4f else 0f) else 0f
+        post.blur = lerp(post.blur, wantBlur, 1f - exp(-realDt * 5f))
+        boostGlow = lerp(boostGlow, if (v.boosting && racing) 1f else 0f, 1f - exp(-realDt * (if (v.boosting) 10f else 3f)))
+        post.boost = if (settings.effects == Level.OFF) 0f else min(1f, boostGlow + boostKick)
+        // vanishing point: far ahead along the road
+        if (PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
+            post.focusU = proj[0].coerceIn(0.2f, 0.8f); post.focusV = proj[1].coerceIn(0.3f, 0.8f)
+        }
+        post.rays = if (settings.godRays) (if (theme.night) 0.4f else 1f) * (theme.sunIntensity / 3.2f).coerceIn(0.4f, 1.3f) else 0f
+        val sd = env.sunDir
+        val seen = PostFx.project(camera, (eye[0] - sd[0] * 1000f).toDouble(), (eye[1] - sd[1] * 1000f).toDouble(), (eye[2] - sd[2] * 1000f).toDouble(), proj)
+        val vis = if (seen) {
+            val ox = max(0f, max(-proj[0], proj[0] - 1f)); val oy = max(0f, max(-proj[1], proj[1] - 1f))
+            (1f - max(ox, oy) / 0.35f).coerceIn(0f, 1f)
+        } else 0f
+        if (seen) { post.sunU = proj[0]; post.sunV = proj[1] }
+        post.sunVisible = lerp(post.sunVisible, vis, 1f - exp(-realDt * 6f))
+    }
 
     fun setAspect(a: Float) { aspect = a }
 
@@ -143,14 +185,10 @@ class GameScene(
                 lx = px + dx * 5f; ly = py + 1.2f; lz = pz + dz * 5f
             }
             CamMode.CINEMA -> {
-                when (cineKind) {
-                    0 -> { ex = px + fr.rx * cineSide * 12f + dx * 8f; ez = pz + fr.rz * cineSide * 12f + dz * 8f; ey = py + 1.5f }
-                    1 -> { ex = px + dx * 16f + fr.rx * cineSide * 3f; ez = pz + dz * 16f + fr.rz * cineSide * 3f; ey = track.groundHeight(v.progress + 16f) + 0.8f }
-                    else -> { ex = px - dx * 4f + fr.rx * cineSide * 6f; ez = pz - dz * 4f + fr.rz * cineSide * 6f; ey = py + 10f }
-                }
-                lx = px; ly = py + 1f; lz = pz
-                follow = 1f - exp(-realDt * 4f)
-                wantFov = 50f
+                jumpCam.frame(realDt * race.timeScale, px, py, pz, dx, dz, fr.rx, fr.rz, camE, camL)
+                ex = camE[0]; ey = camE[1]; ez = camE[2]; lx = camL[0]; ly = camL[1]; lz = camL[2]
+                follow = 1f - exp(-realDt * jumpCam.stiffness)
+                wantFov = jumpCam.fov
             }
             CamMode.ORBIT -> {
                 orbitAngle += realDt * 0.45f
@@ -165,16 +203,23 @@ class GameScene(
         eye[0] = lerp(eye[0], ex, follow); eye[1] = lerp(eye[1], ey, follow); eye[2] = lerp(eye[2], ez, follow)
         look[0] = lerp(look[0], lx, min(1f, follow * 2f)); look[1] = lerp(look[1], ly, min(1f, follow * 2f)); look[2] = lerp(look[2], lz, min(1f, follow * 2f))
         fov = lerp(fov, wantFov, 1f - exp(-realDt * 4f))
+        val wantRoll = if (camMode == CamMode.CINEMA) jumpCam.roll else 0f
+        camRoll = lerp(camRoll, wantRoll, 1f - exp(-realDt * 3f))
         shake = max(0f, shake - realDt * 2.5f)
         val sk = shake * shake * 0.5f
         val sx = (rnd.nextFloat() - 0.5f) * sk; val sy = (rnd.nextFloat() - 0.5f) * sk
         camera.setProjection(fov.toDouble(), aspect.toDouble(), 0.3, 6000.0, Camera.Fov.VERTICAL)
-        camera.lookAt((eye[0] + sx).toDouble(), (eye[1] + sy).toDouble(), eye[2].toDouble(), look[0].toDouble(), look[1].toDouble(), look[2].toDouble(), 0.0, 1.0, 0.0)
+        // up vector tilted by the cinematic roll (dutch angle)
+        var vfx = look[0] - eye[0]; var vfz = look[2] - eye[2]
+        val vl = sqrt(vfx * vfx + vfz * vfz).coerceAtLeast(1e-4f); vfx /= vl; vfz /= vl
+        val upX = -vfz * sin(camRoll); val upY = cos(camRoll); val upZ = vfx * sin(camRoll)
+        camera.lookAt((eye[0] + sx).toDouble(), (eye[1] + sy).toDouble(), eye[2].toDouble(), look[0].toDouble(), look[1].toDouble(), look[2].toDouble(), upX.toDouble(), upY.toDouble(), upZ.toDouble())
         env.follow(eye[0], eye[1], eye[2])
         scenery.updateLod(eye[0], eye[2])
         val camDist = sqrt((eye[0] - px).pow(2) + (eye[1] - py).pow(2) + (eye[2] - pz).pow(2))
         settings.setDof(view, camMode == CamMode.CINEMA || camMode == CamMode.ORBIT, camDist, camera)
         hud.letterbox = lerp(hud.letterbox, if (camMode == CamMode.CINEMA) 1f else 0f, 1f - exp(-realDt * 6f))
+        updatePost(realDt, v, px, py, pz, dx, dz)
         view.vignetteOptions = View.VignetteOptions().apply {
             enabled = true; midPoint = 0.45f - 0.15f * boost; roundness = 0.6f; feather = 0.6f
             color = if (boost > 0f) floatArrayOf(0.3f, 0.05f, 0f, 1f) else floatArrayOf(0f, 0f, 0f, 1f)
@@ -203,11 +248,18 @@ class GameScene(
                     sound.play("whoosh")
                     val air = 2f * e.strength / race.gravity
                     if (air > 0.7f && race.phase == RacePhase.RACING) {
-                        camMode = CamMode.CINEMA; cineSide = if (rnd.nextBoolean()) 1f else -1f; cineKind = (cineKind + 1) % 3; cineTimer = air
+                        camMode = CamMode.CINEMA; cineTimer = air
+                        track.frame(pv.progress, fr)
+                        val land = pv.progress + pv.speed * air
+                        jumpCam.start(air, ev[0], ev[1], ev[2], fr.tx, fr.tz, fr.rx, fr.rz, pv.speed, track.groundHeight(land))
                     }
+                    // ramp sparks off the lip
+                    add.burst(14, ev[0], ev[1] + 0.2f, ev[2], 7f, 3f, 0.45f, 0.1f, 0.04f, 4f, 2.6f, 0.9f, 1f, 16f, 0.04f)
                 }
                 EventType.LAND -> {
                     alpha.burst(18, ev[0], ev[1] + 0.2f, ev[2], 6f, 1f, 1.0f, 1.0f, 4f, 0.8f, 0.75f, 0.7f, 0.55f, -0.3f)
+                    // dust ring rolling out from the landing
+                    alpha.ring(if (mine) 28 else 12, ev[0], ev[1] + 0.3f, ev[2], 9f + e.strength * 0.3f, 0.9f, 1.2f, 3.5f, 0.85f, 0.8f, 0.72f, 0.5f, up = 0.6f, gravity = -0.2f)
                     if (mine) {
                         shake = max(shake, min(0.9f, e.strength * 0.05f)); sound.play("land", e.strength)
                         if (camMode == CamMode.CINEMA) camMode = CamMode.CHASE
@@ -215,10 +267,19 @@ class GameScene(
                 }
                 EventType.PAD -> {
                     add.burst(16, ev[0], ev[1] + 0.3f, ev[2], 6f, 4f, 0.5f, 0.6f, 0.1f, 0.3f, 1.6f, 3f, 1f, 0f)
+                    add.ring(18, ev[0], ev[1] + 0.25f, ev[2], 14f, 0.35f, 0.5f, 0.2f, 0.4f, 1.8f, 3.5f, 1f, up = 0f, stretch = 0.05f)
+                    if (mine) boostKick = max(boostKick, 0.5f)
                     if (mine) { sound.play("pad"); hud.flash = max(hud.flash, 0.35f) }
                 }
-                EventType.BOOST -> if (mine) { sound.play("boost"); hud.flash = 0.6f; shake = max(shake, 0.3f) }
-                EventType.RESET -> if (mine) { hud.whoops = 1.6f; hud.flash = 0.8f; sound.play("whoops") }
+                EventType.BOOST -> {
+                    // shockwave: a ring of hot sparks plus a bright flash of the car's boost light
+                    add.ring(if (mine) 36 else 16, ev[0], ev[1] + 0.5f, ev[2], 16f, 0.4f, 0.7f, 0.15f, 3.5f, 2f, 0.6f, 1f, up = 1f, stretch = 0.04f)
+                    if (mine) { sound.play("boost"); hud.flash = 0.6f; shake = max(shake, 0.3f); boostKick = 1f }
+                }
+                EventType.RESET -> {
+                    trails.cut(race.racers.indexOfFirst { it.vehicle === e.car }.coerceAtLeast(0))
+                    if (mine) { hud.whoops = 1.6f; hud.flash = 0.8f; sound.play("whoops") }
+                }
                 EventType.FINISH -> if (mine) {
                     hud.finishPlace = e.strength.toInt()
                     camMode = CamMode.ORBIT
@@ -317,12 +378,21 @@ class GameScene(
             val ux = ry * fz - rz * fy; val uy = rz * fx - rx * fz; val uz = rx * fy - ry * fx
             Mat.basis(mtx, rx, ry, rz, ux, uy, uz, fx, fy, fz, tmpP[0], tmpP[1], tmpP[2])
             val blink = v.resetFlash > 0f && ((time * 12).toInt() % 2 == 0)
-            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting) 1f else 0f, time, blink)
+            val kick = if (r.isPlayer) boostKick else 0f
+            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting) 1f + kick * 0.8f else 0f, time, blink)
+            // light trails from both rear corners (model +X maps to -right)
+            val heat = if (v.boosting && !blink) 1f else 0f
+            for (k in 0..1) {
+                val lx = if (k == 0) 0.6f else -0.6f; val ly = 0.55f; val lz = -1.9f
+                trails.push(i, k, tmpP[0] - rx * lx + ux * ly + fx * lz, tmpP[1] - ry * lx + uy * ly + fy * lz, tmpP[2] - rz * lx + uz * ly + fz * lz, heat)
+            }
         }
+        boostKick = max(0f, boostKick - realDt * 3f)
         knock.update()
         ambientFx(realDt)
         updateCamera(realDt)
         val cr = camera.getLeftVector(FloatArray(3)); val cu = camera.getUpVector(FloatArray(3))
+        trails.update(eye[0], eye[1], eye[2])
         add.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         alpha.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         tropics?.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
@@ -344,6 +414,7 @@ class GameScene(
     fun destroy() {
         cars.forEach { it.destroy() }
         knock.destroy(); scenery.destroy(); trackR.destroy(); env.destroy()
+        water.destroy(); trails.destroy()
         add.destroy(scene); alpha.destroy(scene)
         tropics?.destroy()
         weather?.destroy(scene)

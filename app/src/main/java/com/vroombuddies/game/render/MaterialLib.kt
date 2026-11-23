@@ -5,6 +5,7 @@ import com.google.android.filament.Engine
 import com.google.android.filament.Material
 import com.google.android.filament.filamat.MaterialBuilder
 import com.google.android.filament.filamat.MaterialBuilder.*
+import com.vroombuddies.game.render.fx.FxShaders
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -22,8 +23,11 @@ class MaterialLib(private val ctx: Context) {
     lateinit var glowTex: Material    // unlit scrolling texture (boost pads)
     lateinit var particleAdd: Material
     lateinit var particleAlpha: Material
+    // optional effects materials (render/fx): null if this phone's driver can't build them, and the effect is skipped
+    var water: Material? = null
+    var postFx: Material? = null
 
-    private class Spec(val name: String, val configure: (MaterialBuilder) -> MaterialBuilder, val source: String)
+    private class Spec(val name: String, val configure: (MaterialBuilder) -> MaterialBuilder, val source: String, val optional: Boolean = false)
 
     // skinning, VSM and stereo variants are never used: skip them to make compiling 3x faster
     private val variantFilter = 8 or 32 or 128
@@ -141,7 +145,7 @@ class MaterialLib(private val ctx: Context) {
                 material.baseColor = vec4(c.rgb * a, a);
             }
         """),
-    )
+    ) + FxShaders.specs.map { Spec(it.name, it.configure, it.source, optional = true) }
 
     /** Slow (first launch only): compile or load every material package. Safe on a background thread. */
     fun preparePackages(progress: (Float) -> Unit): Map<String, ByteBuffer> {
@@ -151,7 +155,7 @@ class MaterialLib(private val ctx: Context) {
         specs.forEachIndexed { i, spec ->
             val key = (spec.name + spec.source + VERSION).hashCode().toUInt().toString(16)
             val f = File(dir, "${spec.name}-$key.filamat")
-            val bytes = if (f.exists()) f.readBytes() else {
+            val bytes = if (f.exists()) f.readBytes() else try {
                 if (!initDone) { MaterialBuilder.init(); initDone = true }
                 val b = MaterialBuilder()
                     .name(spec.name)
@@ -166,8 +170,12 @@ class MaterialLib(private val ctx: Context) {
                 val arr = ByteArray(buf.remaining()); buf.get(arr)
                 f.writeBytes(arr)
                 arr
+            } catch (t: Throwable) {
+                if (!spec.optional) throw t
+                android.util.Log.w("Vroom", "optional material ${spec.name} skipped", t)
+                null
             }
-            out[spec.name] = ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).put(bytes).also { it.flip() }
+            if (bytes != null) out[spec.name] = ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).put(bytes).also { it.flip() }
             progress((i + 1f) / specs.size)
         }
         if (initDone) MaterialBuilder.shutdown()
@@ -179,6 +187,8 @@ class MaterialLib(private val ctx: Context) {
         fun mk(n: String): Material { val b = pkgs.getValue(n); return Material.Builder().payload(b, b.remaining()).build(engine) }
         lit = mk("lit"); paint = mk("paint"); textured = mk("textured"); glow = mk("glow"); glowTex = mk("glowTex")
         particleAdd = mk("particleAdd"); particleAlpha = mk("particleAlpha")
+        fun opt(n: String): Material? = if (pkgs.containsKey(n)) try { mk(n) } catch (t: Throwable) { null } else null
+        water = opt("water"); postFx = opt("postFx")
     }
 
     companion object { const val VERSION = "filament-1.81.0-v1" }

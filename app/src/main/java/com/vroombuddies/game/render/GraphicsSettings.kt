@@ -21,6 +21,7 @@ class GraphicsSettings(private val ctx: Context) {
     var bloom = prefs.getBoolean("bloom", true)
     var reflections = prefs.getBoolean("ssr", false)
     var motionBlur = prefs.getBoolean("mblur", true)
+    var godRays = prefs.getBoolean("godrays", true)
     var depthOfField = prefs.getBoolean("dof", true)
     var effects = Level.valueOf(prefs.getString("fx", Level.HIGH.name)!!)
     var foliageWind = prefs.getBoolean("wind", true)
@@ -31,7 +32,7 @@ class GraphicsSettings(private val ctx: Context) {
     fun save() = prefs.edit()
         .putString("aa", antiAliasing.name).putString("shadows", shadows.name).putString("ssao", ssao.name)
         .putString("tex", textureQuality.name).putString("aniso", anisotropic.name)
-        .putBoolean("bloom", bloom).putBoolean("ssr", reflections).putBoolean("mblur", motionBlur).putBoolean("dof", depthOfField)
+        .putBoolean("bloom", bloom).putBoolean("ssr", reflections).putBoolean("mblur", motionBlur).putBoolean("godrays", godRays).putBoolean("dof", depthOfField)
         .putString("fx", effects.name).putBoolean("wind", foliageWind).putBoolean("dynres", dynamicResolution).putBoolean("fog", fog)
         .putInt("fps", targetFps).apply()
 
