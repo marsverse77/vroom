@@ -4,7 +4,22 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: launch-check
+          github-token: ${{ github.token }}
+          run-id: 45193860068
+      - name: Inspect the cached launch screenshot
+        run: |
+          convert cached.png -resize 800x -quality 75 title.jpg
+          echo VROOM_PREVIEW_BEGIN
+          base64 -w 120 title.jpg
+          echo VROOM_PREVIEW_END
   build:
     runs-on: ubuntu-latest
     steps:
