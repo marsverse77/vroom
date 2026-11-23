@@ -104,6 +104,7 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
         buildRamps(out)
         buildPads(out)
         buildBoostGuides(out)
+        buildChargeGates(out)
         buildStart(Frame(), out)
         if (theme.ground != null) buildGround(out)
     }
@@ -149,6 +150,24 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
                 }
             }
             out(m, TrackLayer.RAMP)
+        }
+    }
+
+    private fun buildChargeGates(out: (MeshData, TrackLayer) -> Unit) {
+        val housing = MeshData()
+        val light = MeshData()
+        for (gate in track.chargeGates) {
+            val frame = track.frame(gate.s)
+            val x = frame.x + frame.rx * gate.x
+            val z = frame.z + frame.rz * gate.x
+            val yaw = atan2(frame.tx, frame.tz)
+            val pose = Mat.trs(x, frame.y + 0.08f, z, ry = yaw)
+            Prims.torus(housing, gate.halfWidth + 0.28f, 0.24f, Rgba.hex(0x27374e), pose, 8, 32, PI.toFloat())
+            Prims.torus(light, gate.halfWidth, 0.10f, Rgba.hex(0xffbf4a), pose, 6, 32, PI.toFloat())
+        }
+        if (housing.iCount > 0) {
+            out(housing, TrackLayer.ARCH)
+            out(light, TrackLayer.ARCH_GLOW)
         }
     }
 

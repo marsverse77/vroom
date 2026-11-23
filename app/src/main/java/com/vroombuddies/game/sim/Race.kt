@@ -6,6 +6,8 @@ class Racer(val vehicle: Vehicle, val isPlayer: Boolean, val carIndex: Int, val 
     var laneTarget = 0f
     var laneTimer = 0f
     var place = 0
+    var collectedGates = 0
+    var gateLap = -1
     var aiBoostCooldown = 0f
 }
 
@@ -145,6 +147,22 @@ class Race(
     private fun postStep(r: Racer, dt: Float) {
         val v = r.vehicle
         val s = track.wrap(v.progress)
+        if (r.isPlayer && phase == RacePhase.RACING && v.progress >= 0f && !v.finished) {
+            val lap = (v.progress / track.length).toInt()
+            if (lap != r.gateLap) {
+                r.collectedGates = 0
+                r.gateLap = lap
+            }
+            for ((i, gate) in track.chargeGates.withIndex()) {
+                val bit = 1 shl i
+                if ((r.collectedGates and bit) != 0 || abs(track.delta(gate.s, s)) > gate.halfLength) continue
+                if (abs(v.x - gate.x) > gate.halfWidth || !v.onGround) continue
+                r.collectedGates = r.collectedGates or bit
+                v.energy = min(100f, v.energy + 25f)
+                v.boostTimer = max(v.boostTimer, 1.8f)
+                events.add(GameEvent(EventType.BOOST, v, 2f, s, v.x, v.y))
+            }
+        }
         // boost pads
         for ((i, pad) in track.pads.withIndex()) {
             if (v.onGround && abs(track.delta(pad.s, s)) < pad.halfLength && abs(v.x - pad.x) < pad.halfWidth + 0.6f) {

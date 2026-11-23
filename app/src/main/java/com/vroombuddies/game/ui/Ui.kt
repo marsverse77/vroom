@@ -36,10 +36,10 @@ object Ui {
 
     // Racing palette: carbon and steel surfaces, white type, one hot red accent and gold for wins/boost.
     // The old names are kept so every screen picks the palette up from one place.
-    const val ACCENT = 0xffc94b1e.toInt()      // racing red: primary actions
+    const val ACCENT = 0xffbf3e24.toInt()      // racing red: primary actions
     const val GOLD = 0xffffb81c.toInt()        // boost, stars, first place
-    const val STEEL = 0xff176773.toInt()       // secondary buttons
-    const val CARBON = 0xff103441.toInt()      // panels
+    const val STEEL = 0xff245b72.toInt()       // secondary buttons
+    const val CARBON = 0xff1c293c.toInt()      // panels
     const val YELLOW = GOLD
     const val ORANGE = STEEL
     const val PINK = ACCENT
@@ -125,7 +125,7 @@ object Ui {
     }
 
     /** Dark see-through card: for name plates, stats and settings. */
-    fun panel(color: Int = 0xee123847.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
+    fun panel(color: Int = 0xf0203045.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
 
     /** Slanted racing button: dips when pressed, springs back. */
     @SuppressLint("ClickableViewAccessibility")
@@ -135,25 +135,35 @@ object Ui {
     fun makeButton(ctx: Context, label: String, color: Int, sizeSp: Float, round: Boolean, onClick: () -> Unit): TextView =
         text(ctx, label, sizeSp * 0.86f, outline = false).apply {
             (this as OutlinedText).square = round
-            typeface = fontPlain
+            typeface = if (round) fontPlain else font
+            letterSpacing = if (round) 0f else 0.045f
             minHeight = dpi(48f)
             minWidth = dpi(48f)
             isFocusable = true
             setOnClickListener { onClick() }
-            val bg = ChunkyDrawable(color, dp(if (round) 200f else 20f), lip = dp(4f))
-            background = bg
+            val bg = ChunkyDrawable(color, dp(if (round) 200f else 6f), lip = dp(4f), slant = if (round) 0f else dp(12f))
+            background = android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x44ffffff), bg, null)
             // round buttons get slim vertical padding: a TextView whose text overflows scrolls, and that
             // would shift the background up and clip the bottom of the circle
             if (round) setPadding(dpi(10f), dpi(3f), dpi(10f), dpi(3f) + bg.lip.toInt())
             else setPadding(dpi(28f), dpi(7f), dpi(28f), dpi(9f) + bg.lip.toInt())
             setOnTouchListener { v, e ->
                 when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.94f).scaleY(0.94f).translationY(dp(2f)).setDuration(60).start()
+                    MotionEvent.ACTION_DOWN -> {
+                        v.drawableHotspotChanged(e.x, e.y)
+                        v.isPressed = true
+                        v.animate().scaleX(0.96f).scaleY(0.96f).translationY(dp(2f)).setDuration(60).start()
+                    }
                     MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
                         v.animate().scaleX(1f).scaleY(1f).translationY(0f).setInterpolator(OvershootInterpolator(2f)).setDuration(200).start()
                         if (e.x in 0f..v.width.toFloat() && e.y in 0f..v.height.toFloat()) v.performClick()
                     }
-                    MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).translationY(0f).setDuration(120).start()
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        v.animate().scaleX(1f).scaleY(1f).translationY(0f).setDuration(120).start()
+                    }
                 }
                 true
             }

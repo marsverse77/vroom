@@ -3,18 +3,18 @@ package com.vroombuddies.game.render
 import kotlin.math.abs
 
 /** Two-tone printed graphics projected onto each painted door. Dimensions are in model metres. */
-internal enum class RaceLivery(rgb: Int, val spokes: Int, val centreY: Float, val stencil: List<String>) {
-    Sprint(0xffbe27, 5, 0.82f, listOf("00111", "01110", "11100", "00110", "01100", "11000")),
-    Pearl(0x54e3ec, 3, 1.08f, listOf("01110", "11011", "10001", "10001", "11011", "01110")),
-    Summit(0xff783d, 8, 1.65f, listOf("00100", "01110", "11011", "10001", "10101", "11111")),
-    Comet(0x92adff, 7, 0.72f, listOf("00011", "00111", "01110", "11100", "11000", "10000")),
-    Courier(0x42eaba, 4, 1.05f, listOf("00010", "00111", "11111", "11111", "00111", "00010")),
-    Rally(0xffff49, 6, 0.98f, listOf("10101", "01010", "10101", "01010", "10101", "01010")),
-    Honey(0xffac42, 9, 0.99f, listOf("01110", "10001", "10101", "10101", "10001", "01110"));
+internal enum class RaceLivery(rgb: Int, val spokes: Int, val stencil: List<String>) {
+    Sprint(0xffbe27, 5, listOf("00111", "01110", "11100", "00110", "01100", "11000")),
+    Pearl(0x54e3ec, 3, listOf("01110", "11011", "10001", "10001", "11011", "01110")),
+    Summit(0xff783d, 8, listOf("00100", "01110", "11011", "10001", "10101", "11111")),
+    Comet(0x92adff, 7, listOf("00011", "00111", "01110", "11100", "11000", "10000")),
+    Courier(0x42eaba, 4, listOf("00010", "00111", "11111", "11111", "00111", "00010")),
+    Rally(0xffff49, 6, listOf("10101", "01010", "10101", "01010", "10101", "01010")),
+    Honey(0xffac42, 9, listOf("01110", "10001", "10101", "10101", "10001", "01110"));
 
     val color = Rgba.hex(rgb)
 
-    fun apply(parts: CarParts) {
+    fun apply(parts: CarParts, height: Float) {
         val body = parts.paint
         val ink = parts.trim
         val dark = Rgba.hex(0x172840)
@@ -56,7 +56,7 @@ internal enum class RaceLivery(rgb: Int, val spokes: Int, val centreY: Float, va
             }
             for (side in listOf(-1f, 1f)) {
                 fun vertex(r: Int, k: Int): Int {
-                    val y = centreY + (rows / 2f - r) * tile
+                    val y = height + (rows / 2f - r) * tile
                     val z = (k - cols / 2f + (rows / 2f - r) * 0.18f) * tile * 1.65f
                     return ink.vertex(side * (samples.getOrPut(y to z) { surface(y, z) } + 0.011f), y, z, side, 0f, 0f, fill)
                 }

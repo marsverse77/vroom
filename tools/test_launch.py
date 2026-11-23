@@ -17,14 +17,14 @@ def running():
 
 adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
 adb("install", "-r", "VroomBuddies-fixed.apk")
-def tap_label(text):
+def tap_label(text, exact=False):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         result = adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
         if b"dumped" in result.lower():
             root = ET.fromstring(adb("exec-out", "cat", "/sdcard/window.xml"))
             for n in root.iter("node"):
-                if text in n.get("text", "") and n.get("package") == PACKAGE:
+                if (n.get("text", "") == text if exact else text in n.get("text", "")) and n.get("package") == PACKAGE:
                     left, top, right, bottom = map(int, re.findall(r"\d+", n.get("bounds")))
                     adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
                     time.sleep(1)
@@ -52,7 +52,13 @@ for launch in ("first", "cached"):
         (OUT / f"{launch}.png").write_bytes(adb("exec-out", "screencap", "-p"))
         print(f"Verified {launch} launch and showroom frame")
         if launch == "cached":
-            for label in ("Play", "Next", "Next", "01"):
+            tap_label("Play")
+            for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
+                if index:
+                    tap_label("▶", exact=True)
+                time.sleep(1)
+                (OUT / f"car-{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+            for label in ("Next", "Next", "01"):
                 tap_label(label)
             deadline = time.monotonic() + 100
             while time.monotonic() < deadline:

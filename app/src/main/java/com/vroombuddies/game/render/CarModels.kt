@@ -69,88 +69,12 @@ object CarParts3 {
 object Zoomy : CarDesign {
     override val id = "zoomy"
     override val name = "Zoomy"
-    override val tagline = "Super speedy!"
+    override val tagline = "Aero coupe"
     override val params = VehicleParams(mass = 1f, topSpeed = 53f, boostSpeed = 82f)
 
-    override fun build(): CarParts {
-        val c = CarParts()
-        c.wheelRadius = 0.52f
-        // Loft a continuous shell from tail to nose. Wider shoulders rise over each wheel.
-        val rings = arrayOf(
-            floatArrayOf(-2.18f, 0.70f, 0.57f, 0.94f),
-            floatArrayOf(-2.04f, 1.01f, 0.46f, 1.14f),
-            floatArrayOf(-1.48f, 1.18f, 0.40f, 1.30f),
-            floatArrayOf(-0.86f, 1.12f, 0.38f, 1.23f),
-            floatArrayOf(0.10f, 1.07f, 0.38f, 1.18f),
-            floatArrayOf(1.12f, 1.16f, 0.40f, 1.21f),
-            floatArrayOf(1.72f, 1.12f, 0.43f, 1.12f),
-            floatArrayOf(2.09f, 0.95f, 0.50f, 1.00f),
-            floatArrayOf(2.21f, 0.70f, 0.58f, 0.91f))
-        val segments = 32
-        fun contour(value: Float) = sign(value) * abs(value).pow(0.56f)
-        fun point(row: Int, angle: Float): FloatArray {
-            val (z, width, low, high) = rings[row]
-            return floatArrayOf(width * contour(cos(angle)),
-                (low + high + (high - low) * contour(sin(angle))) * 0.5f, z)
-        }
-        for (row in rings.indices) {
-            for (side in 0 until segments) {
-                val angle = (side * 2.0 * PI / segments).toFloat()
-                val p = point(row, angle)
-                val a = point(row, angle - 0.02f)
-                val b = point(row, angle + 0.02f)
-                val rear = point(max(0, row - 1), angle)
-                val fore = point(min(rings.lastIndex, row + 1), angle)
-                val dx = b[0] - a[0]
-                val dy = b[1] - a[1]
-                val dz = fore[2] - rear[2]
-                val nx = dy * dz
-                val ny = -dx * dz
-                val nz = dx * (fore[1] - rear[1]) - dy * (fore[0] - rear[0])
-                val length = sqrt(nx * nx + ny * ny + nz * nz)
-                c.paint.vertex(p[0], p[1], p[2], nx / length, ny / length, nz / length, Rgba.WHITE)
-            }
-        }
-        for (row in 0 until rings.lastIndex) for (side in 0 until segments) {
-            val a = row * segments + side
-            val b = row * segments + (side + 1) % segments
-            c.paint.quad(a, b, b + segments, a + segments)
-        }
-        for (row in listOf(0, rings.lastIndex)) {
-            val ring = rings[row]
-            val cap = c.paint.vertex(0f, (ring[2] + ring[3]) / 2f, ring[0], 0f, 0f,
-                if (row == 0) -1f else 1f, Rgba.WHITE)
-            for (side in 0 until segments) {
-                val a = row * segments + side
-                val b = row * segments + (side + 1) % segments
-                if (row == 0) c.paint.tri(cap, b, a) else c.paint.tri(cap, a, b)
-            }
-        }
-        Prims.sphere(c.glass, 1f, Rgba.hex(0x244e61),
-            Mat.trs(0f, 1.10f, -0.31f, sx = 0.88f, sy = 0.67f, sz = 1.22f), 32, 18)
-        Prims.sphere(c.paint, 1f, Rgba.WHITE,
-            Mat.trs(0f, 1.65f, -0.46f, sx = 0.60f, sy = 0.15f, sz = 0.74f), 28, 14)
-        for (s in floatArrayOf(-1f, 1f)) {
-            Prims.sphere(c.paint, 1f, Rgba.WHITE,
-                Mat.trs(s * 0.91f, 1.30f, 0.30f, sx = 0.19f, sy = 0.10f, sz = 0.25f))
-        }
-        // spoiler
-        Prims.roundBox(c.trim, 2.2f, 0.12f, 0.55f, 0.05f, DARK, Mat.trs(0f, 1.62f, -2.0f))
-        for (s in floatArrayOf(-0.7f, 0.7f)) Prims.box(c.trim, 0.12f, 0.45f, 0.25f, DARK, Mat.trs(s, 1.35f, -1.95f))
-        // bumpers and side skirts
-        Prims.roundBox(c.trim, 2.36f, 0.3f, 0.4f, 0.14f, DARK, Mat.trs(0f, 0.45f, 2.1f))
-        Prims.roundBox(c.trim, 2.36f, 0.3f, 0.4f, 0.14f, DARK, Mat.trs(0f, 0.45f, -2.1f))
-        CarParts3.face(c, 2.18f, 0.88f, 0.62f, 0.3f, 0.35f)
-        // tail lights
-        for (s in floatArrayOf(-0.75f, 0.75f)) Prims.roundBox(c.lights, 0.45f, 0.18f, 0.08f, 0.06f, Rgba(1f, 0.08f, 0.05f), Mat.trs(s, 0.92f, -2.21f))
-        RaceLivery.Sprint.apply(c)
-        CarParts3.wheel(c.wheel, c.wheelRadius, 0.42f, RaceLivery.Sprint.color, RaceLivery.Sprint.spokes)
-        c.wheelPos.add(floatArrayOf(-1.08f, c.wheelRadius, 1.35f)); c.wheelPos.add(floatArrayOf(1.08f, c.wheelRadius, 1.35f))
-        c.wheelPos.add(floatArrayOf(-1.08f, c.wheelRadius, -1.35f)); c.wheelPos.add(floatArrayOf(1.08f, c.wheelRadius, -1.35f))
-        c.exhausts.add(floatArrayOf(-0.5f, 0.5f, -2.3f)); c.exhausts.add(floatArrayOf(0.5f, 0.5f, -2.3f))
-        for (e in c.exhausts) Prims.cylinder(c.trim, 0.14f, 0.16f, 0.35f, RIM, Mat.trs(e[0], e[1], e[2] + 0.1f, rx = (PI / 2).toFloat()), 12)
-        return c
-    }
+    override fun build() = SupercarBody.build(params, RaceLivery.Sprint,
+        wheelRadius = 0.51f, noseWidth = 0.63f, belt = 0.91f, roofRise = 0.65f,
+        cockpitZ = -0.15f, cockpitLength = 0.49f, cockpitWidth = 0.61f)
 }
 
 object CarDesigns {
@@ -198,7 +122,7 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
         addPart(parts.paint, paintMi, body); addPart(parts.trim, trimMi, body); addPart(parts.glass, glassMi, body)
         addPart(parts.lights, lightMi, body, shadows = false)
         val wheelMesh = Gpu.upload(engine, parts.wheel).also { meshes.add(it) }
-        val wheelMi = lit(mats, 0.55f, 0f)
+        val wheelMi = lit(mats, 0.39f, 0.27f)
         for (i in 0 until 4) {
             val e = Gpu.renderable(engine, wheelMesh, wheelMi)
             tm.create(e, tm.getInstance(root)); wheels[i] = e; ents.add(e); scene.addEntity(e)

@@ -47,6 +47,7 @@ class TrackPath(val shape: TrackShape) {
     private val th: FloatArray      // heading angle θ of the tangent (unwrapped)
     private val kap: FloatArray
     val jumps = ArrayList<Jump>()
+    val chargeGates = ArrayList<BoostPad>()
     val pads = ArrayList<BoostPad>()
     val knockSpots = ArrayList<KnockSpot>()
 
@@ -113,6 +114,15 @@ class TrackPath(val shape: TrackShape) {
         placeJumps(rng)
         placePads()
         placeKnocks(rng)
+        for (i in 0..2) {
+            val target = length * (0.18f + i * 0.33f)
+            val s = (0..12).map { wrap(target + it * 14f) }.firstOrNull { pos ->
+                jumps.none { delta(it.s0, pos) in -30f..(it.length + 75f) } &&
+                    pads.none { abs(delta(it.s, pos)) < 18f }
+            } ?: continue
+            val lane = ((i + shape.seed) % 3 - 1) * halfWidth * 0.40f
+            chargeGates.add(BoostPad(s, lane, halfWidth = 3.8f, halfLength = 3f))
+        }
     }
 
     private fun cr(v: DoubleArray, i0: Int, i1: Int, i2: Int, i3: Int, t: Double, m: Int): Double {
