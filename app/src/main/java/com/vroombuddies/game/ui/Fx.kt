@@ -263,41 +263,23 @@ class TileDrawable(private val top: Int, private val mid: Int, private val botto
     @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
 }
 
-/** Small travel-poster landscapes. The track palette and seed keep each preview recognisable. */
-class CoursePostcard(ctx: Context, private val theme: com.vroombuddies.game.content.Theme) : View(ctx) {
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val shape = Path()
+/** Sample one illustrated course from the shared atlas. Inset the edges to avoid neighbouring tiles. */
+class CoursePostcard(ctx: Context, private val atlas: Bitmap, index: Int) : View(ctx) {
+    private val ink = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val frame = RectF()
+    private val rounded = Path()
+    private val source = Rect(index%5*atlas.width/5+2,index/5*atlas.height/4+2,
+        (index%5+1)*atlas.width/5-2,(index/5+1)*atlas.height/4-2)
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) {
+        val inset = Ui.dp(3f)
+        frame.set(inset,inset,w-inset,h-inset-Ui.dp(4f))
+        rounded.reset(); rounded.addRoundRect(frame,Ui.dp(10f),Ui.dp(10f),Path.Direction.CW)
+    }
     override fun onDraw(c: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat()
-        if (w <= 0 || h <= 0) return
-        c.save(); c.scale(w / 200f,h / 230f)
-        shape.reset(); shape.addRoundRect(3f,3f,197f,224f,10f,10f,Path.Direction.CW); c.clipPath(shape)
-        val horizon = theme.skyHorizon or Color.BLACK
-        val land = (theme.ground?.first ?: theme.skyBottom) or Color.BLACK
-        val seed = theme.shape.seed
-        p.color = if (theme.night) 0xffd9ecff.toInt() else 0xffffeaa4.toInt()
-        c.drawCircle(44f+seed%36,63f,15f,p)
-        val urban = theme.name in setOf("Neon City","Toy Town","Sunset Highway","Moon Base","Space Station")
-        p.color = Ui.lighten(land,0.30f)
-        if (urban) {
-            for (i in 0..10) {
-                val y = 70f + (i*seed%42)
-                c.drawRect(i*20f-2f,y,i*20f+15f,146f,p)
-            }
-        } else {
-            shape.reset(); shape.moveTo(-10f,150f)
-            for (i in 0..10) shape.lineTo(i*23f-12f, if (i%2==0) 114f else 62f+(i*seed%34))
-            shape.lineTo(216f,153f); shape.close(); c.drawPath(shape,p)
-        }
-        p.color=land; shape.reset(); shape.moveTo(0f,125f); shape.quadTo(39f,104f,98f,124f)
-        shape.quadTo(146f,135f,200f,108f); shape.lineTo(200f,230f); shape.lineTo(0f,230f)
-        shape.close(); c.drawPath(shape,p)
-        shape.reset(); shape.moveTo(119f,117f); shape.cubicTo(174f,122f,83f,130f,80f,143f)
-        shape.cubicTo(73f,157f,150f,164f,181f,218f); shape.lineTo(72f,218f)
-        shape.cubicTo(73f,183f,48f,162f,56f,147f); shape.cubicTo(67f,130f,153f,124f,119f,117f)
-        shape.close(); p.color=Ui.darken(horizon,0.55f); c.drawPath(shape,p)
-        p.color=0xffffeba6.toInt()
-        c.drawOval(82f,139f,88f,141f,p); c.drawOval(66f,149f,73f,152f,p)
-        c.restore()
+        c.save(); c.clipPath(rounded)
+        val scale = max(frame.width()/source.width(),frame.height()/source.height())
+        c.translate(frame.centerX(),frame.centerY())
+        c.scale(scale,scale); c.translate(-source.exactCenterX(),-source.exactCenterY())
+        c.drawBitmap(atlas,source,source,ink); c.restore()
     }
 }

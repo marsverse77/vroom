@@ -134,7 +134,7 @@ class GameActivity : Activity(), MenuHost {
     private fun ensureShowroom() {
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
         sound.menuMusic()
-        if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings).also { it.setAspect(aspect) }
+        if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings, resources).also { it.setAspect(aspect) }
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 

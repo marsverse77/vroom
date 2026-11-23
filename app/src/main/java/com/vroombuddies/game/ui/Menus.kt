@@ -262,8 +262,9 @@ object Menus {
         header(ctx, root, "Where to race?", Ui.PURPLE, host) { host.toPaintPicker() }
         val scroll = HorizontalScrollView(ctx).apply { isHorizontalScrollBarEnabled = false; clipToPadding = false; setPadding(Ui.dpi(20f), Ui.dpi(6f), Ui.dpi(20f), Ui.dpi(6f)) }
         val strip = Ui.row(ctx)
+        val posters = BitmapFactory.decodeResource(ctx.resources, com.vroombuddies.game.R.drawable.festival_worlds)
         com.vroombuddies.game.content.Themes.all.forEachIndexed { i, th ->
-            val tile = trackTile(ctx, th, i, host.stars(i))
+            val tile = trackTile(ctx, th, i, host.stars(i), posters)
             tile.setOnClickListener { host.click(); tile.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).withEndAction { host.startRace(i) }.start() }
             strip.addView(tile, LinearLayout.LayoutParams(Ui.dpi(190f), Ui.dpi(232f)).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) })
             Ui.popIn(tile, 40L * i)
@@ -273,12 +274,12 @@ object Menus {
         return root
     }
 
-    private fun trackTile(ctx: Context, th: Theme, index: Int, stars: Int): View {
+    private fun trackTile(ctx: Context, th: Theme, index: Int, stars: Int, posters: Bitmap): View {
         val card = FrameLayout(ctx)
         card.background = TileDrawable(th.skyTop or 0xff000000.toInt(), th.skyHorizon or 0xff000000.toInt(), (th.ground?.first ?: th.skyBottom) or 0xff000000.toInt())
-        card.addView(CoursePostcard(ctx, th), Ui.lp(-1,-1,Gravity.CENTER))
-        card.addView(Ui.text(ctx, th.emoji, 31f, outline = false), Ui.lp(-2,-2,Gravity.TOP or Gravity.START,l=15f,t=45f))
-        card.addView(TrackMapView(ctx, th.shape, Ui.INK), Ui.lp(Ui.dpi(72f), Ui.dpi(72f), Gravity.TOP or Gravity.END, r = 10f, t = 14f))
+        card.addView(CoursePostcard(ctx, posters, index), Ui.lp(-1,-1,Gravity.CENTER))
+        val map = TrackMapView(ctx, th.shape, Color.WHITE).apply { background = Ui.panel(0xb0265182.toInt(), 12f) }
+        card.addView(map, Ui.lp(Ui.dpi(48f), Ui.dpi(48f), Gravity.TOP or Gravity.END,r=7f,t=6f))
         // number badge
         val num = Ui.text(ctx, "%02d".format(index + 1), 15f).apply { background = Ui.ChunkyDrawable(Ui.ACCENT, Ui.dp(4f), lip = Ui.dp(2f), gloss = false, slant = Ui.dp(6f)); setPadding(Ui.dpi(12f), Ui.dpi(1f), Ui.dpi(12f), Ui.dpi(4f)) }
         card.addView(num, Ui.lp(-2, -2, Gravity.TOP or Gravity.START, l = 8f, t = 8f))

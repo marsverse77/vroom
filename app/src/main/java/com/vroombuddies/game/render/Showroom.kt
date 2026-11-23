@@ -5,13 +5,14 @@ import com.vroombuddies.game.content.Themes
 import kotlin.math.*
 
 /** The 3D backdrop of the menus: the chosen car spinning on a turntable under a bright sky. */
-class Showroom(private val engine: Engine, private val scene: Scene, private val view: View, private val camera: Camera, private val mats: MaterialLib, private val settings: GraphicsSettings) {
+class Showroom(private val engine: Engine, private val scene: Scene, private val view: View, private val camera: Camera, private val mats: MaterialLib, private val settings: GraphicsSettings, resources: android.content.res.Resources) {
     private val theme = Themes.all[0].copy(skyTop = 0x259bff, skyHorizon = 0xb1efff, skyBottom = 0x62cbdc, sunColor = 0xffeac6)
     private val env = Environment(engine, scene, mats, theme)
     private var car: CarInstance? = null
     private val ents = ArrayList<Int>()
     private val meshes = ArrayList<GpuMesh>()
     private val mis = ArrayList<MaterialInstance>()
+    private val harborTexture: Texture
     private var wheelEntity = 0
     private val wheelTransform = FloatArray(16)
     private var angle = 0.12f
@@ -54,27 +55,27 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         Prims.plane(f, 260f, 260f, Rgba.hex(0x39c4cf), Mat.trs(0f,-4.2f,0f))
         Prims.cylinder(f, 10f, 10.3f, 0.52f, Rgba.hex(0xe2a873), Mat.trs(0f,-0.85f,0f),64)
         Prims.cylinder(f, 9.94f, 10f, 0.085f, Rgba.hex(0xffdc9c), Mat.trs(0f,-0.55f,0f),64)
-        val rng = com.vroombuddies.game.sim.Rng(512)
+        // One painted panorama spans the horizon behind the moving 3D fairground.
         val facades = intArrayOf(0x50c9d0,0xffac78,0x9db7ee,0xffc96e,0x85d7af,0xfe91a2)
-        for (i in 0 until 46) {
-            val a = (2*PI*i/46).toFloat()
-            val r = 35f + rng.f()*15f
-            val x = sin(a)*r; val z = cos(a)*r
-            val h = 4f + rng.f()*9f; val w = 2.4f + rng.f()*2.8f
-            val col = facades[i % facades.size]
-            box(w,h,3.4f,col,x,h/2-4f,z,a)
-            box(w+0.22f,0.42f,3.62f,0xf4f3d8,x,h-4f,z,a)
-            for (j in 1..3) {
-                val wy = h * j / 4 - 3.4f
-                box(w*0.76f,0.34f,0.1f,0x398ba7,x-sin(a)*1.72f,wy,z-cos(a)*1.72f,a)
-            }
+        val backdrop = MeshData()
+        val n = 0.7071068f
+        fun corner(right: Float, y: Float, u: Float, v: Float): Int =
+            backdrop.vertex((-26f+right)*n,y,(-26f-right)*n,n,0f,n,Rgba.WHITE,u,v)
+        val bl = corner(-34f,-10.6f,0f,1f)
+        val br = corner(34f,-10.6f,1f,1f)
+        val tr = corner(34f,16.6f,1f,0f)
+        val tl = corner(-34f,16.6f,0f,0f)
+        backdrop.quadFacing(bl,br,tr,tl)
+        val bitmap = android.graphics.BitmapFactory.decodeResource(resources,com.vroombuddies.game.R.drawable.festival_harbor)
+        harborTexture = Textures.upload(engine,bitmap)
+        val backdropMi = mats.textured.createInstance().also {
+            it.setParameter("albedo",harborTexture,Textures.sampler(repeat=false))
+            it.setParameter("uvScale",1f,1f); it.setParameter("tint",1f,1f,1f,1f)
+            it.setParameter("roughness",1f); it.setParameter("glow",0.35f); mis.add(it)
         }
-        for (i in 0 until 13) {
-            val a = (2*PI*i/13).toFloat()
-            for (j in -1..1) Prims.sphere(f, 1f, Rgba.hex(0xfff7db),
-                Mat.trs(sin(a)*57f + j*2.5f, 8f + i%4 + if(j==0) 1f else 0f, cos(a)*57f,
-                    sx=3.7f,sy=1.35f,sz=1.8f),12,7)
-        }
+        val bg = Gpu.upload(engine,backdrop).also { meshes.add(it) }
+        val be = Gpu.renderable(engine,bg,backdropMi,castShadows=false,receiveShadows=false)
+        ents.add(be); scene.addEntity(be)
         // Pennants curve around the launch platform, below the car silhouette.
         for (i in 0 until 28) {
             val a = (2*PI*i/28).toFloat()
@@ -161,6 +162,7 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         car?.destroy()
         for (e in ents) { scene.remove(e); engine.destroyEntity(e) }
         meshes.forEach { it.destroy(engine) }; mis.forEach { engine.destroyMaterialInstance(it) }
+        engine.destroyTexture(harborTexture)
         env.destroy()
         camera.setShift(0.0, 0.0)
         grading?.let { view.colorGrading = null; engine.destroyColorGrading(it) }
