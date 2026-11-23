@@ -15,7 +15,7 @@ object Scoot : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.42f, 0.36f, 0.9f, 1.05f, -1.05f)
+        CarKit.wheels(c, 0.42f, 0.36f, 0.9f, 1.05f, -1.05f, RaceLivery.Courier)
         // tall rounded box body
         Prims.roundBox(c.paint, 1.9f, 1.5f, 3.1f, 0.42f, Rgba.WHITE, Mat.trs(0f, 1.27f, 0f))
         CarKit.fenders(c, c.paint, Rgba.WHITE, gap = 0.07f)
@@ -36,6 +36,7 @@ object Scoot : CarDesign {
             mouthZ = 1.56f, mouthY = 0.7f, mouthW = 0.2f, cheeks = true)
         CarKit.tailLights(c, 0.62f, 1.05f, -1.56f, 0.32f, 0.3f)
         CarKit.exhaust(c, 0.5f, 0.45f, -1.62f, 0.11f)
+        RaceLivery.Courier.apply(c)
         return c
     }
 }

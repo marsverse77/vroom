@@ -103,6 +103,7 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
         }
         buildRamps(out)
         buildPads(out)
+        buildBoostGuides(out)
         buildStart(Frame(), out)
         if (theme.ground != null) buildGround(out)
     }
@@ -149,6 +150,30 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
             }
             out(m, TrackLayer.RAMP)
         }
+    }
+
+    /** Three narrowing chevrons lead young drivers into the actual boost lane. */
+    private fun buildBoostGuides(out: (MeshData, TrackLayer) -> Unit) {
+        val guides = MeshData()
+        val frame = Frame()
+        val color = Rgba.hex(theme.kerbs.first)
+        fun vertex(s: Float, x: Float): Int {
+            track.frame(s, frame)
+            return guides.vertex(frame.x + frame.rx * x, track.groundHeight(s) + 0.12f,
+                frame.z + frame.rz * x, 0f, 1f, 0f, color)
+        }
+        for (pad in track.pads) for (step in 1..3) {
+            val tip = pad.s - pad.halfLength - step * 7f
+            val width = pad.halfWidth * (0.60f + step * 0.08f)
+            for (side in listOf(-1, 1)) {
+                val a = vertex(tip, pad.x)
+                val b = vertex(tip - 2f, pad.x + side * width)
+                val c = vertex(tip - 2.85f, pad.x + side * width)
+                val d = vertex(tip - 0.85f, pad.x)
+                guides.quadFacing(a, b, c, d)
+            }
+        }
+        if (guides.iCount > 0) out(guides, TrackLayer.ARCH_GLOW)
     }
 
     private fun buildPads(out: (MeshData, TrackLayer) -> Unit) {

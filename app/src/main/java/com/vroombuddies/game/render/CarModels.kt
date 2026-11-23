@@ -34,7 +34,7 @@ private val BLACK = Rgba.hex(0x101014)
 
 object CarParts3 {
     /** Standard cartoon wheel: chunky tyre, shiny rim, hub cap. */
-    fun wheel(m: MeshData, r: Float, w: Float, rim: Rgba = RIM) {
+    fun wheel(m: MeshData, r: Float, w: Float, rim: Rgba = RIM, spokes: Int = 5) {
         val rot = Mat.trs(rz = (PI / 2).toFloat())
         Prims.cylinder(m, r, r, w, TIRE, rot, 22)
         Prims.torus(m, r * 0.86f, w * 0.32f, TIRE, Mat.trs(w * 0.32f, 0f, 0f, 0f, (PI / 2).toFloat(), 0f), 8, 22)
@@ -46,7 +46,11 @@ object CarParts3 {
                 Mat.trs(side * w * 0.53f, 0f, 0f, ry = (PI / 2).toFloat()), 6, 28)
         }
         // spokes make the spin visible
-        for (k in 0 until 5) Prims.box(m, w * 1.08f, r * 0.12f, r * 1.0f, rim, Mat.trs(rx = (k * PI * 2 / 5).toFloat()))
+        for (k in 0 until spokes) {
+            val angle = (2 * PI * k / spokes).toFloat()
+            Prims.box(m, w * 1.09f, r * 0.13f, r * 0.49f, rim,
+                Mat.trs(0f, -sin(angle) * r * 0.34f, cos(angle) * r * 0.34f, rx = angle))
+        }
     }
 
     /** Friendly face: round headlight "eyes" with pupils and a smiling grille. */
@@ -139,9 +143,8 @@ object Zoomy : CarDesign {
         CarParts3.face(c, 2.18f, 0.88f, 0.62f, 0.3f, 0.35f)
         // tail lights
         for (s in floatArrayOf(-0.75f, 0.75f)) Prims.roundBox(c.lights, 0.45f, 0.18f, 0.08f, 0.06f, Rgba(1f, 0.08f, 0.05f), Mat.trs(s, 0.92f, -2.21f))
-        // racing number disc on the doors
-        for (s in floatArrayOf(-1f, 1f)) Prims.cylinder(c.trim, 0.42f, 0.42f, 0.04f, WHITE, Mat.trs(s * 1.16f, 0.82f, 0f, rz = (PI / 2).toFloat()), 18)
-        CarParts3.wheel(c.wheel, c.wheelRadius, 0.42f)
+        RaceLivery.Sprint.apply(c)
+        CarParts3.wheel(c.wheel, c.wheelRadius, 0.42f, RaceLivery.Sprint.color, RaceLivery.Sprint.spokes)
         c.wheelPos.add(floatArrayOf(-1.08f, c.wheelRadius, 1.35f)); c.wheelPos.add(floatArrayOf(1.08f, c.wheelRadius, 1.35f))
         c.wheelPos.add(floatArrayOf(-1.08f, c.wheelRadius, -1.35f)); c.wheelPos.add(floatArrayOf(1.08f, c.wheelRadius, -1.35f))
         c.exhausts.add(floatArrayOf(-0.5f, 0.5f, -2.3f)); c.exhausts.add(floatArrayOf(0.5f, 0.5f, -2.3f))

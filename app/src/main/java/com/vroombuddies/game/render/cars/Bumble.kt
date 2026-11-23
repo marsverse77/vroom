@@ -15,7 +15,7 @@ object Bumble : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.5f, 0.42f, 1.02f, 1.55f, -1.55f)
+        CarKit.wheels(c, 0.5f, 0.42f, 1.02f, 1.55f, -1.55f, RaceLivery.Honey)
         // tall bus body
         Prims.roundBox(c.paint, 2.2f, 1.85f, 4.6f, 0.48f, Rgba.WHITE, Mat.trs(0f, 1.5f, 0f))
         CarKit.fenders(c, c.paint, Rgba.WHITE, gap = 0.08f)
@@ -38,6 +38,7 @@ object Bumble : CarDesign {
             mouthZ = 2.31f, mouthY = 0.76f, mouthW = 0.27f, cheeks = true)
         CarKit.tailLights(c, 0.78f, 1.15f, -2.31f, 0.3f, 0.42f)
         CarKit.exhaust(c, -0.6f, 0.45f, -2.4f, 0.12f)
+        RaceLivery.Honey.apply(c)
         return c
     }
 }

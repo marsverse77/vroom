@@ -16,7 +16,7 @@ object Rocket : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.48f, 0.45f, 1.12f, 1.6f, -1.55f)
+        CarKit.wheels(c, 0.48f, 0.45f, 1.12f, 1.6f, -1.55f, RaceLivery.Comet)
         // long low body with a pointy, sloping nose
         Prims.roundBox(c.paint, 2.0f, 0.56f, 4.4f, 0.26f, Rgba.WHITE, Mat.trs(0f, 0.72f, -0.2f))
         CarKit.ellipsoid(c.paint, 1.0f, 0.3f, 0.9f, Rgba.WHITE, Mat.trs(0f, 0.72f, 2.0f))
@@ -38,6 +38,7 @@ object Rocket : CarDesign {
         CarKit.face(c, eyeZ = 2.05f, eyeY = 1.02f, eyeX = 0.48f, eyeR = 0.3f,
             mouthZ = 2.78f, mouthY = 0.55f, mouthW = 0.24f, brows = true)
         CarKit.tailLights(c, 0.6f, 0.78f, -2.42f, 0.4f, 0.16f)
+        RaceLivery.Comet.apply(c)
         return c
     }
 }

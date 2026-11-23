@@ -19,7 +19,7 @@ object Hopper : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.62f, 0.56f, 1.15f, 1.4f, -1.35f, rim = Rgba.hex(0xffd23f))
+        CarKit.wheels(c, 0.62f, 0.56f, 1.15f, 1.4f, -1.35f, RaceLivery.Rally)
         // knobbly tread blocks so the tyres look off-road (part of the spinning wheel mesh)
         for (k in 0 until 12) {
             val a = k * PI_F * 2 / 12
@@ -50,6 +50,7 @@ object Hopper : CarDesign {
         CarKit.tailLights(c, 0.65f, 1.0f, -1.86f, 0.26f, 0.2f)
         CarKit.exhaust(c, 0.6f, 0.75f, -1.9f, 0.13f)
         CarKit.exhaust(c, -0.6f, 0.75f, -1.9f, 0.13f)
+        RaceLivery.Rally.apply(c)
         return c
     }
 }

@@ -148,6 +148,31 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
         return cells.getOrPut(key) { Cell((ix + 0.5f) * cellSize, (iz + 0.5f) * cellSize) }
     }
 
+    // Landmarks share a stretch of the lap so children can recognise the route on lap two.
+    private val sectors = when (theme.name) {
+        "Sunny Meadow" -> listOf(setOf("windmill", "flower"), setOf("grandstand", "flagRow"), setOf("balloon"))
+        "Desert Canyon" -> listOf(setOf("rockArch", "cactus"), setOf("waterTower", "barrelCactus"), setOf("mesa"))
+        "Space Station" -> listOf(setOf("rocket", "beacon"), setOf("station", "satellite"), setOf("planet"))
+        "Neon City" -> listOf(setOf("building", "lamp"), setOf("neonSign", "trafficLight"), setOf("hydrant"))
+        "Snowy Peaks" -> listOf(setOf("snowFort", "snowman"), setOf("igloo", "penguin"), setOf("snowCabin", "sled"))
+        "Sunny Beach" -> listOf(setOf("umbrella", "beachBall"), setOf("lifeguardTower", "surfboards"), setOf("sandcastle", "crab"))
+        "Jungle Jam" -> listOf(setOf("tikiTotem", "fern"), setOf("jungleRuin", "bigLeaf"), setOf("parrot", "giantFlower"))
+        "Volcano Run" -> listOf(setOf("obsidian", "burntTree"), setOf("lavaPool", "lavaRock"), setOf("volcano"))
+        "Sweet Treats" -> listOf(setOf("candyCane", "lollipop"), setOf("bigCake", "cupcake"), setOf("iceCream", "donut"))
+        "Moon Base" -> listOf(setOf("dome", "antenna"), setOf("rover", "crater"), setOf("rocket", "beacon"))
+        "Autumn Woods" -> listOf(setOf("redBarn", "hayBale"), setOf("appleCart", "scarecrow"), setOf("pumpkin", "toadstool"))
+        "Rainbow Sky" -> listOf(setOf("cloudCastle", "skyStar"), setOf("rainbow", "cloudPuff"), setOf("balloon"))
+        "Frozen Lake" -> listOf(setOf("iceberg", "icePond"), setOf("iceSkater", "penguin"), setOf("snowFort", "igloo"))
+        "Pirate Cove" -> listOf(setOf("jollyFlag", "cannon"), setOf("chest", "anchor"), setOf("lantern", "beachHut"))
+        "Dino Valley" -> listOf(setOf("bigEgg", "fern"), setOf("dinoBuddy", "cycad"), setOf("longNeck"))
+        "Toy Town" -> listOf(setOf("toyBlocks", "pencil"), setOf("toyHouse", "teddy"), setOf("crayon", "toyBall"))
+        "Sunset Highway" -> listOf(setOf("diner", "roadSign"), setOf("billboard", "lamp"), setOf("waterTower"))
+        "Crystal Canyon" -> listOf(setOf("glowMushroom", "crystal"), setOf("spire"), setOf("beacon", "starBit"))
+        "Bubble Reef" -> listOf(setOf("clam", "anemone"), setOf("sunkenShip", "chest"), setOf("jellyfish", "fish"))
+        "Galaxy Grand Prix" -> listOf(setOf("ring", "beacon"), setOf("station", "rocket"), setOf("planet", "satellite"))
+        else -> emptyList()
+    }
+
     fun place(): SceneryLayout {
         val rng = Rng(theme.shape.seed * 31 + 7)
         // coarse copy of the centre line for distance tests
@@ -160,16 +185,21 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
             val b = SceneryLibrary.builders[rule.id]
             if (b == null) { missing.add(rule.id); continue }
             val hi = b(0); val lo = b(1)
+            val sector = sectors.indexOfFirst { rule.id in it }
             var placed = 0; var tries = 0
             while (placed < rule.count && tries < rule.count * 20) {
                 tries++
                 val sc = rule.scaleMin + rng.f() * (rule.scaleMax - rule.scaleMin)
-                val ps = rng.f() * track.length
+                // Gather a few signature props per district. Leave the rest dispersed.
+                val staged = sector >= 0 && placed < minOf(8, (rule.count + 1) / 2)
+                val fraction = if (staged) (sector + 0.5f + (rng.f() - 0.5f) * 0.48f) / 3f else rng.f()
+                val ps = fraction * track.length
                 track.frame(ps, f)
                 val side = if (rng.f() < 0.5f) -1f else 1f
                 if (hi.trackside && abs(f.kappa) > 0.0025f) continue
                 val r = if (hi.trackside) 0.5f else hi.radius * sc
-                val dist = edge + r + rule.minDist + rng.f() * (rule.maxDist - rule.minDist)
+                val spread = (rule.maxDist - rule.minDist) * if (staged) 0.26f else 1f
+                val dist = edge + r + rule.minDist + rng.f() * spread
                 val x = f.x + f.rx * side * dist; val z = f.z + f.rz * side * dist
                 // keep clear of every part of the road
                 var ok = true

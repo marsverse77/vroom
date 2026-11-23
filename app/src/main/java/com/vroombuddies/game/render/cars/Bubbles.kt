@@ -16,7 +16,7 @@ object Bubbles : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.45f, 0.36f, 1.02f, 1.2f, -1.2f)
+        CarKit.wheels(c, 0.45f, 0.36f, 1.02f, 1.2f, -1.2f, RaceLivery.Pearl)
         // egg body and a dark rubber band around its middle
         CarKit.ellipsoid(c.paint, 1.15f, 0.74f, 2.0f, Rgba.WHITE, Mat.trs(0f, 1.05f, 0f))
         Prims.torus(c.trim, 1f, 0.1f, CarKit.DARK, Mat.trs(0f, 0.8f, 0f, rx = HALF_PI, sx = 1.1f, sy = 1.92f), 6, 40)
@@ -31,6 +31,7 @@ object Bubbles : CarDesign {
             mouthZ = 1.9f, mouthY = 0.66f, mouthW = 0.26f, cheeks = true, tongue = true)
         CarKit.tailLights(c, 0.55f, 1.05f, -1.93f, 0.3f, 0.22f)
         CarKit.exhaust(c, 0f, 0.55f, -1.92f, 0.13f)
+        RaceLivery.Pearl.apply(c)
         return c
     }
 }

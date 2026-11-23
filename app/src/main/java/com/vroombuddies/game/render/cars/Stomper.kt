@@ -16,7 +16,7 @@ object Stomper : CarDesign {
 
     override fun build(): CarParts {
         val c = CarParts()
-        CarKit.wheels(c, 0.85f, 0.7f, 1.3f, 1.45f, -1.45f)
+        CarKit.wheels(c, 0.85f, 0.7f, 1.3f, 1.45f, -1.45f, RaceLivery.Summit)
         // frame and axles under the body
         Prims.roundBox(c.trim, 1.5f, 0.35f, 3.8f, 0.12f, CarKit.DARK, Mat.trs(0f, 1.05f, 0f), 3)
         for (z in floatArrayOf(1.45f, -1.45f)) Prims.cylinder(c.trim, 0.12f, 0.12f, 2.2f, CarKit.DARK, Mat.trs(0f, 0.85f, z, rz = HALF_PI), 8)
@@ -45,6 +45,7 @@ object Stomper : CarDesign {
             Prims.cylinder(c.trim, 0.11f, 0.11f, 1.1f, CarKit.CHROME, Mat.trs(s * 0.95f, 2.6f, -1.35f), 10)
             CarKit.exhaust(c, s * 0.95f, 3.1f, -1.45f, 0.13f)
         }
+        RaceLivery.Summit.apply(c)
         return c
     }
 }
