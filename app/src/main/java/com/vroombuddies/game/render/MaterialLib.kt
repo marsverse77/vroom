@@ -155,6 +155,7 @@ class MaterialLib(private val ctx: Context) {
         specs.forEachIndexed { i, spec ->
             val key = (spec.name + spec.source + VERSION).hashCode().toUInt().toString(16)
             val f = File(dir, "${spec.name}-$key.filamat")
+            com.vroombuddies.game.Diagnostics.step(if (f.exists()) "load shader ${spec.name}" else "compile shader ${spec.name}")
             val bytes = if (f.exists()) f.readBytes() else try {
                 if (!initDone) { MaterialBuilder.init(); initDone = true }
                 val b = MaterialBuilder()
@@ -184,7 +185,7 @@ class MaterialLib(private val ctx: Context) {
 
     /** Fast: create GPU materials from prepared packages. Must run on the render thread. */
     fun create(engine: Engine, pkgs: Map<String, ByteBuffer>) {
-        fun mk(n: String): Material { val b = pkgs.getValue(n); return Material.Builder().payload(b, b.remaining()).build(engine) }
+        fun mk(n: String): Material { com.vroombuddies.game.Diagnostics.step("create material $n"); val b = pkgs.getValue(n); return Material.Builder().payload(b, b.remaining()).build(engine) }
         lit = mk("lit"); paint = mk("paint"); textured = mk("textured"); glow = mk("glow"); glowTex = mk("glowTex")
         particleAdd = mk("particleAdd"); particleAlpha = mk("particleAlpha")
         fun opt(n: String): Material? = if (pkgs.containsKey(n)) try { mk(n) } catch (t: Throwable) { null } else null

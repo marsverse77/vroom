@@ -15,27 +15,37 @@ import kotlin.math.max
 class Sound(ctx: Context) : SoundSink {
     val settings = AudioSettings.of(ctx)
     private val mixer = Mixer()
-    private val track: AudioTrack
+    private val track: AudioTrack? = makeTrack()
     @Volatile private var running = true
     @Volatile var muted = false
     var engineOn: Boolean
         get() = mixer.engine.on
         set(v) { mixer.engine.on = v; if (!v) { mixer.engine.speed = 0f; mixer.engine.slide = 0f } }
 
-    init {
-        val min = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        track = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-            .setAudioFormat(AudioFormat.Builder().setSampleRate(RATE).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-            .setBufferSizeInBytes(max(min * 2, 2048 * 2 * 2))
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-            .build()
-        track.play()
-        Thread({ loop() }, "synth").apply { priority = Thread.MAX_PRIORITY; isDaemon = true; start() }
+    /** Low-latency stream if the device offers it, a plain one if not, and silence rather than a crash. */
+    private fun makeTrack(): AudioTrack? {
+        for (lowLatency in listOf(true, false)) {
+            try {
+                val min = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val b = AudioTrack.Builder()
+                    .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                    .setAudioFormat(AudioFormat.Builder().setSampleRate(RATE).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                    .setBufferSizeInBytes(max(min * 2, 2048 * 2 * 2))
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                if (lowLatency) b.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                val t = b.build()
+                t.play()
+                return t
+            } catch (t: Throwable) { android.util.Log.w("Vroom", "audio track (lowLatency=$lowLatency) failed", t) }
+        }
+        return null
     }
 
-    private fun loop() {
+    init {
+        if (track != null) Thread({ loop(track) }, "synth").apply { priority = Thread.MAX_PRIORITY; isDaemon = true; start() }
+    }
+
+    private fun loop(track: AudioTrack) {
         android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
         val n = 512
         val buf = FloatArray(n)
