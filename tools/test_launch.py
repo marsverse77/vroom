@@ -15,6 +15,7 @@ def adb(*args):
 def running():
     return subprocess.run(["adb", "shell", "pidof", PACKAGE], stdout=subprocess.DEVNULL).returncode == 0
 
+adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
 adb("install", "-r", "VroomBuddies-fixed.apk")
 def tap_label(text):
     deadline = time.monotonic() + 30
