@@ -34,4 +34,8 @@ try:
         else:
             raise RuntimeError(f"Title did not appear during {launch} launch")
 finally:
-    (out / "startup.log").write_bytes(adb("logcat", "-d", "-t", "5000"))
+    logs = adb("logcat", "-d", "-t", "5000")
+    (out / "startup.log").write_bytes(logs)
+    for line in logs.decode(errors="replace").splitlines():
+        if any(tag in line for tag in ("AndroidRuntime", " DEBUG ", "Filament", "filament", "Vroom", "Fatal signal")):
+            print(line)
