@@ -11,6 +11,11 @@ font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 for i, (file, label) in enumerate(screens):
     x, y = (i % 2) * 720, (i // 2) * 450
     with Image.open(root / (file + ".png")) as frame:
+        # Catch the previous black home screen despite successful surface submission.
+        if file == "cached":
+            sample = frame.convert("L").resize((80, 45))
+            if sum(sample.histogram()[:12]) > 0.6 * 80 * 45:
+                raise RuntimeError("Home background is blank in the captured frame")
         image = ImageOps.contain(frame.convert("RGB"), (704, 396))
         sheet.paste(image, (x + (720-image.width)//2, y + 8 + (396-image.height)//2))
     draw.text((x+15,y+408), label, fill="white", font=font)

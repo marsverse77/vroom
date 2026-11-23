@@ -139,8 +139,8 @@ class GameActivity : Activity(), MenuHost {
     }
 
     override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
-    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.carPicker(this, this, carIndex)) }
-    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
+    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.carPicker(this, this, carIndex)) }
+    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
     override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }

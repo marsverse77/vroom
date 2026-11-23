@@ -229,15 +229,7 @@ class GameScene(
         settings.setDof(view, camMode == CamMode.CINEMA || camMode == CamMode.ORBIT, camDist, camera)
         hud.letterbox = lerp(hud.letterbox, if (camMode == CamMode.CINEMA) 1f else 0f, 1f - exp(-realDt * 6f))
         updatePost(realDt, v, px, py, pz, dx, dz)
-        if (boost != vignetteBoost) {
-            vignetteBoost = boost
-            vignette.midPoint = 0.45f - 0.15f * boost
-            vignette.color = if (boost > 0f) VIGNETTE_BOOST else VIGNETTE_PLAIN
-            view.vignetteOptions = vignette
-        }
     }
-    private val vignette = View.VignetteOptions().apply { enabled = true; roundness = 0.6f; feather = 0.6f }
-    private var vignetteBoost = -1f
 
     // ------------------------------------------------------------------ effects
     private fun worldOf(s: Float, x: Float, y: Float, out: FloatArray) { track.frame(s, fr); out[0] = fr.x + fr.rx * x; out[1] = y; out[2] = fr.z + fr.rz * x }
@@ -442,8 +434,6 @@ class GameScene(
 
     companion object {
         const val NEAR = 0.5; const val FAR = 3000.0
-        private val VIGNETTE_PLAIN = floatArrayOf(0f, 0f, 0f, 1f)
-        private val VIGNETTE_BOOST = floatArrayOf(0.3f, 0.05f, 0f, 1f)
         private val FIREWORK_COLOURS = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
     }
 

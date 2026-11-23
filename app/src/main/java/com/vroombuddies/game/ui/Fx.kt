@@ -283,3 +283,31 @@ class CoursePostcard(ctx: Context, private val atlas: Bitmap, index: Int) : View
         c.drawBitmap(atlas,source,source,ink); c.restore()
     }
 }
+
+/** Oversized starting-flag switch, with a raised enamel face and a hand-drawn chequer. */
+class StartFlagDrawable : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val face = RectF()
+    private val flag = Path()
+    override fun draw(c: Canvas) {
+        val w=bounds.width().toFloat(); val h=bounds.height().toFloat()
+        if (w<=0f || h<=0f) return
+        c.save(); c.translate(bounds.left.toFloat(),bounds.top.toFloat())
+        face.set(w*0.025f,h*0.025f,w*0.985f,h*0.98f)
+        Ui.drawChunky(c,face,h*0.32f,0xff46b32a.toInt(),lip=h*0.13f,outline=Ui.dp(2.5f),p=p)
+        c.save(); c.translate(w*0.14f,h*0.40f); c.rotate(-12f)
+        val u=h*0.083f
+        p.strokeCap=Paint.Cap.ROUND; p.strokeWidth=u*0.74f; p.color=Ui.INK
+        c.drawLine(-u*0.25f,-u*1.8f,-u*0.25f,u*3.2f,p)
+        flag.reset(); flag.moveTo(0f,-u*1.8f); flag.cubicTo(u*2,-u*2.5f,u*3,-u,u*5,-u*1.8f)
+        flag.lineTo(u*5,u*1.3f); flag.cubicTo(u*3,u*2f,u*2,u*0.8f,0f,u*1.4f); flag.close()
+        p.color=Color.WHITE; c.drawPath(flag,p); c.save(); c.clipPath(flag); p.color=Ui.INK
+        for (i in 0..4) for (j in 0..4) if ((i+j)%2==0)
+            c.drawRect(i*u,(j-2)*u,(i+1)*u,(j-1)*u,p)
+        c.restore(); p.style=Paint.Style.STROKE; p.strokeWidth=u*0.32f
+        c.drawPath(flag,p); p.style=Paint.Style.FILL; c.restore(); c.restore()
+    }
+    override fun setAlpha(alpha: Int) {}
+    override fun setColorFilter(cf: ColorFilter?) {}
+    @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
+}

@@ -45,8 +45,14 @@ object Menus {
     }
 
     // ------------------------------------------------------------------ title
+    private fun harborCover(ctx: Context) = android.widget.ImageView(ctx).apply {
+        setImageResource(com.vroombuddies.game.R.drawable.festival_title)
+        scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
     fun title(ctx: Context, host: MenuHost): View {
         val root = Ui.frame(ctx)
+        root.addView(harborCover(ctx),FrameLayout.LayoutParams(-1,-1))
         val badge = android.widget.ImageView(ctx).apply {
             setImageResource(com.vroombuddies.game.R.drawable.wordmark)
             contentDescription = "Vroom Buddies"
@@ -54,7 +60,11 @@ object Menus {
         }
         val width = (ctx.resources.configuration.screenWidthDp * 0.34f).coerceIn(155f, 320f)
         root.addView(badge, Ui.lp(Ui.dpi(width), Ui.dpi(width * 0.39f), Gravity.TOP or Gravity.START, l = 16f, t = 8f))
-        val play = Ui.button(ctx, "Play  ▶", Ui.GREEN, 34f) { host.click(); host.toCarPicker() }
+        val play = Ui.button(ctx, "Play", Ui.GREEN, 36f) { host.click(); host.toCarPicker() }.apply {
+            background = StartFlagDrawable()
+            setPadding(Ui.dpi(45f),0,Ui.dpi(9f),Ui.dpi(6f))
+            setTextColor(0xffffef9c.toInt())
+        }
         root.addView(play, Ui.lp(Ui.dpi(184f), Ui.dpi(65f), Gravity.BOTTOM or Gravity.END, r = 26f, b = 17f))
         Ui.popIn(play, 120)
         // Grown-ups hold the gear to open settings, so a tap from a small finger does nothing.
@@ -85,8 +95,8 @@ object Menus {
     /** Back button on the left and a ribbon title in the middle. */
     private fun header(ctx: Context, root: FrameLayout, s: String, color: Int, host: MenuHost, back: () -> Unit) {
         root.addView(Ui.roundButton(ctx, "◀", Ui.STEEL, 30f) { host.click(); back() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.START, l = 14f, t = 12f))
-        val b = banner(ctx, s, color)
-        root.addView(b, Ui.lp(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 12f))
+        val b = banner(ctx, s, color, 21f)
+        root.addView(b, Ui.lp(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 6f))
         b.translationY = -Ui.dp(120f)
         b.animate().translationY(0f).setDuration(380).setInterpolator(OvershootInterpolator(2f)).start()
     }
@@ -99,7 +109,7 @@ object Menus {
         header(ctx, root, "Pick your car!", Ui.BLUE, host) { host.toTitle() }
         val designs = CarDesigns.all
         var idx = current.coerceIn(0, designs.size - 1)
-        val name = Ui.text(ctx, designs[idx].name.uppercase(), 34f, Color.WHITE, slant = true)
+        val name = Ui.text(ctx, designs[idx].name.uppercase(), 26f, Color.WHITE, slant = true)
         val tag = Ui.text(ctx, designs[idx].tagline, 15f, 0xccffffff.toInt()).apply { typeface = Ui.fontPlain }
         val stats = StatsView(ctx).apply { set(designs[idx].params) }
         val dots = PageDots(ctx, designs.size, idx)
@@ -124,15 +134,15 @@ object Menus {
         }
         // bottom bar: stats card, name plate, go button
         val bar = Ui.row(ctx).apply { gravity = Gravity.BOTTOM }
-        bar.addView(stats, LinearLayout.LayoutParams(Ui.dpi(200f), Ui.dpi(96f)))
-        val plate = Ui.col(ctx).apply { background = Ui.panel(); setPadding(Ui.dpi(26f), Ui.dpi(4f), Ui.dpi(26f), Ui.dpi(12f)) }
+        bar.addView(stats, LinearLayout.LayoutParams(Ui.dpi(160f), Ui.dpi(67f)))
+        val plate = Ui.col(ctx).apply { background = Ui.panel(); setPadding(Ui.dpi(14f), Ui.dpi(2f), Ui.dpi(14f), Ui.dpi(5f)) }
         plate.addView(dots, lp(w = Ui.dpi(20f) * designs.size + Ui.dpi(10f), h = Ui.dpi(14f), t = 4f))
         plate.addView(name); plate.addView(tag)
         bar.addView(plate, lp(l = 14f, r = 14f))
         val go = Ui.button(ctx, "Next ▶", Ui.GREEN, 28f) { host.click(); host.toPaintPicker() }
         bar.addView(go)
         pulse(go)
-        root.addView(bar, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 22f))
+        root.addView(bar, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 7f))
         Ui.popIn(stats, 150); Ui.popIn(plate, 80); Ui.popIn(go, 220)
         return root
     }
@@ -143,7 +153,7 @@ object Menus {
         private val txt = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { typeface = Ui.font; color = Color.WHITE }
         private val base = VehicleParams()
         private val values = IntArray(3); private val shown = FloatArray(3)
-        private val labels = arrayOf("SPEED", "GRIP", "BOOST"); private val colors = intArrayOf(Ui.ACCENT, Ui.ACCENT, Ui.GOLD)
+        private val labels = arrayOf("SPEED", "GRIP", "BOOST"); private val colors = intArrayOf(Ui.SKY, Ui.PINK, Ui.GOLD)
         private val bg = Ui.panel(); private val rf = RectF()
         private var first = true
         private fun pips(v: Float, b: Float) = (3 + (v / b - 1f) * 20f).roundToInt().coerceIn(1, 5)
@@ -155,7 +165,7 @@ object Menus {
         override fun onDraw(c: Canvas) {
             var again = false
             bg.setBounds(0, 0, width, height); bg.draw(c)
-            val inner = height - Ui.dp(12f); val rowH = inner / 3f; val pip = Ui.dp(17f); val gap = Ui.dp(5f)
+            val inner = height - Ui.dp(12f); val rowH = inner / 3f; val pip = Ui.dp(13f); val gap = Ui.dp(3f)
             txt.textSize = Ui.dp(14f)
             for (i in 0 until 3) {
                 shown[i] += (values[i] - shown[i]) * 0.25f
@@ -163,7 +173,7 @@ object Menus {
                 val cy = Ui.dp(4f) + rowH * (i + 0.5f)
                 c.drawText(labels[i], Ui.dp(14f), cy + Ui.dp(5f), txt)
                 for (k in 0 until 5) {
-                    val x = Ui.dp(76f) + k * (pip + gap)
+                    val x = Ui.dp(69f) + k * (pip + gap)
                     rf.set(x, cy - pip / 2, x + pip, cy + pip / 2)
                     p.color = Ui.INK; c.drawRoundRect(rf.left - Ui.dp(1.5f), rf.top - Ui.dp(1.5f), rf.right + Ui.dp(1.5f), rf.bottom + Ui.dp(2.5f), Ui.dp(6f), Ui.dp(6f), p)
                     p.color = if (k < shown[i] - 0.01f) colors[i] else 0x33ffffff
