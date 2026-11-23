@@ -18,7 +18,7 @@ internal enum class RaceLivery(rgb: Int, val spokes: Int, val stencil: List<Stri
         val body = parts.paint
         val ink = parts.trim
         val dark = Rgba.hex(0x172840)
-        val tile = if (this == Comet || this == Rally) 0.072f else 0.095f
+        val tile = if (this == Comet || this == Rally) 0.072f else 0.079f
         // Find the outer painted surface at each artwork corner, including rounded doors.
         fun surface(y: Float, z: Float): Float {
             var x = 0f
@@ -58,7 +58,7 @@ internal enum class RaceLivery(rgb: Int, val spokes: Int, val stencil: List<Stri
                 fun vertex(r: Int, k: Int): Int {
                     val y = height + (rows / 2f - r) * tile
                     val z = (k - cols / 2f + (rows / 2f - r) * 0.18f) * tile * 1.65f
-                    return ink.vertex(side * (samples.getOrPut(y to z) { surface(y, z) } + 0.011f), y, z, side, 0f, 0f, fill)
+                    return ink.vertex(side * (samples.getOrPut(y to z) { surface(y, z) } + 0.023f), y, z, side, 0f, 0f, fill)
                 }
                 val a = vertex(row, col)
                 val b = vertex(row, col + 1)
