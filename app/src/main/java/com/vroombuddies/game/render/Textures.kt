@@ -18,6 +18,14 @@ object Textures {
     /** Texture size multiplier from the Texture Quality setting (0.5 low, 1 high). */
     var quality = 1f
 
+    private var roadDetail: Bitmap? = null
+
+    fun loadRoadDetail(resources: android.content.res.Resources) {
+        if (roadDetail == null) {
+            roadDetail = BitmapFactory.decodeResource(resources, com.vroombuddies.game.R.drawable.road_grain)
+        }
+    }
+
     fun sampler(repeat: Boolean = true): TextureSampler {
         val wrap = if (repeat) TextureSampler.WrapMode.REPEAT else TextureSampler.WrapMode.CLAMP_TO_EDGE
         return TextureSampler(TextureSampler.MinFilter.LINEAR_MIPMAP_LINEAR, TextureSampler.MagFilter.LINEAR, wrap).also { it.anisotropy = anisotropy }
@@ -28,6 +36,7 @@ object Textures {
         val levels = (ln(max(w, h).toDouble()) / ln(2.0)).toInt() + 1
         val tex = Texture.Builder().width(w).height(h).levels(levels)
             .sampler(Texture.Sampler.SAMPLER_2D)
+            .usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
             .format(if (srgb) Texture.InternalFormat.SRGB8_A8 else Texture.InternalFormat.RGBA8)
             .build(engine)
         val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
@@ -59,7 +68,10 @@ object Textures {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp); val rnd = Random(7)
         c.drawColor(asphalt or 0xff000000.toInt())
-        noise(c, w, h, 0xff000000.toInt(), 2500, 0xffffffff.toInt(), 22, 0.6f, 2.2f, rnd)
+        roadDetail?.let { detail ->
+            val grain = Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = 95 }
+            c.drawBitmap(detail, null, Rect(0, 0, w, h), grain)
+        }
         val p = Paint()
         val kerbW = w * 0.06f
         val stripes = 8

@@ -47,19 +47,24 @@ object Menus {
     // ------------------------------------------------------------------ title
     fun title(ctx: Context, host: MenuHost): View {
         val root = Ui.frame(ctx)
-        root.addView(SpeedLinesView(ctx, 0x40ffffff), FrameLayout.LayoutParams(-1, -1))
-        checkerEdges(root)
-        val col = Ui.col(ctx)
-        val logoRow = Ui.row(ctx)
-        "VROOM".forEachIndexed { i, ch ->
-            logoRow.addView(Ui.text(ctx, ch.toString(), 78f, Color.WHITE, slant = true).also { zoomIn(it, 60L * i) }, lp(r = -6f))
+        val shade = View(ctx).apply {
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0xca082936.toInt(), 0x48123441, 0x00123441))
         }
-        val logo2 = banner(ctx, "Buddies", Ui.ACCENT, 30f).also { zoomIn(it, 380) }
-        col.addView(logoRow); col.addView(logo2, lp(t = -12f, l = 60f))
-        col.gravity = Gravity.START
-        val play = Ui.button(ctx, "▶  Play", Ui.ACCENT, 40f) { host.click(); host.toCarPicker() }
-        col.addView(play, lp(t = 22f)); Ui.popIn(play, 750); pulse(play)
-        root.addView(col, Ui.lp(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START, l = 40f, b = 6f))
+        root.addView(shade, FrameLayout.LayoutParams(-1, -1))
+        val column = Ui.col(ctx)
+        val badge = android.widget.ImageView(ctx).apply {
+            setImageResource(com.vroombuddies.game.R.drawable.wordmark)
+            contentDescription = "Vroom Buddies"
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        }
+        val width = (ctx.resources.configuration.screenWidthDp * 0.42f).coerceIn(150f, 400f)
+        column.addView(badge, lp(Ui.dpi(width), Ui.dpi(width * 0.38f)))
+        val play = Ui.button(ctx, "▶   Play", Ui.ACCENT, 36f) { host.click(); host.toCarPicker() }
+        column.addView(play, lp(Ui.dpi(width * 0.74f), Ui.dpi(60f), t = 14f))
+        Ui.popIn(play, 100)
+        root.addView(column, Ui.lp(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START, l = 16f))
         // Grown-ups hold the gear to open settings, so a tap from a small finger does nothing.
         val gear = HoldButton(ctx, "⚙", Ui.PURPLE) { host.click(); host.toSettings() }
         root.addView(gear, Ui.lp(Ui.dpi(70f), Ui.dpi(70f), Gravity.TOP or Gravity.END, t = 14f, r = 14f))
@@ -437,20 +442,23 @@ object Menus {
     // ------------------------------------------------------------------ loading
     fun loading(ctx: Context, msg: String): View {
         val root = Ui.frame(ctx)
-        root.setBackgroundColor(0xff121419.toInt())
-        root.addView(SpeedLinesView(ctx, 0x30ffffff, 30, 1.6f), FrameLayout.LayoutParams(-1, -1))
-        root.addView(CheckerStripView(ctx, 2f), Ui.lp(-1, Ui.dpi(18f), Gravity.BOTTOM))
-        root.addView(CheckerStripView(ctx, -2f), Ui.lp(-1, Ui.dpi(18f), Gravity.TOP))
+        root.background = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            intArrayOf(0xff214f5a.toInt(), 0xff071d2a.toInt()))
         val col = Ui.col(ctx)
-        val car = Ui.text(ctx, "🏎", 96f, outline = false).apply { scaleX = -1f }
-        col.addView(car); col.addView(banner(ctx, msg, Ui.ACCENT, 22f), lp(t = 6f))
-        root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-        fun hop() {
-            car.animate().translationY(-Ui.dp(14f)).rotation(-6f).setDuration(180).withEndAction {
-                car.animate().translationY(0f).rotation(0f).setDuration(180).withEndAction { if (car.isAttachedToWindow) hop() }.start()
-            }.start()
+        val badge = android.widget.ImageView(ctx).apply {
+            setImageResource(com.vroombuddies.game.R.drawable.wordmark)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Vroom Buddies"
         }
-        hop()
+        val width = (ctx.resources.configuration.screenWidthDp * 0.47f).coerceIn(160f, 360f)
+        col.addView(badge, lp(Ui.dpi(width), Ui.dpi(width * 0.38f)))
+        col.addView(Ui.text(ctx, msg, 19f, outline = false), lp(t = 12f))
+        val progress = android.widget.ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
+        progress.isIndeterminate = true
+        progress.indeterminateTintList = android.content.res.ColorStateList.valueOf(Ui.GOLD)
+        col.addView(progress, lp(Ui.dpi(width * 0.68f), Ui.dpi(8f), t = 10f))
+        root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         return root
     }
 }

@@ -29,16 +29,17 @@ object Ui {
 
     fun init(ctx: Context) {
         density = ctx.resources.displayMetrics.density
+        com.vroombuddies.game.render.Textures.loadRoadDetail(ctx.resources)
         font = try { ctx.resources.getFont(R.font.exo2_extrabold_italic) } catch (t: Throwable) { font }
         fontPlain = try { ctx.resources.getFont(R.font.exo2_bold) } catch (t: Throwable) { fontPlain }
     }
 
     // Racing palette: carbon and steel surfaces, white type, one hot red accent and gold for wins/boost.
     // The old names are kept so every screen picks the palette up from one place.
-    const val ACCENT = 0xffe8202a.toInt()      // racing red: primary actions
+    const val ACCENT = 0xffc94b1e.toInt()      // racing red: primary actions
     const val GOLD = 0xffffb81c.toInt()        // boost, stars, first place
-    const val STEEL = 0xff2c313b.toInt()       // secondary buttons
-    const val CARBON = 0xff15171c.toInt()      // panels
+    const val STEEL = 0xff176773.toInt()       // secondary buttons
+    const val CARBON = 0xff103441.toInt()      // panels
     const val YELLOW = GOLD
     const val ORANGE = STEEL
     const val PINK = ACCENT
@@ -60,7 +61,7 @@ object Ui {
 
     fun text(ctx: Context, s: String, sizeSp: Float, color: Int = Color.WHITE, outline: Boolean = true, slant: Boolean = false): TextView =
         OutlinedText(ctx, outline).apply {
-            text = s; textSize = sizeSp; typeface = font; setTextColor(color); gravity = Gravity.CENTER
+            text = s; textSize = sizeSp; typeface = if (slant) font else fontPlain; setTextColor(color); gravity = Gravity.CENTER
             includeFontPadding = false; letterSpacing = 0.02f
             if (slant) { paint.textSkewX = SLANT; setPadding(paddingLeft, paddingTop, paddingRight + (textSize * 0.12f).toInt(), paddingBottom) }
         }
@@ -124,7 +125,7 @@ object Ui {
     }
 
     /** Dark see-through card: for name plates, stats and settings. */
-    fun panel(color: Int = 0xe015171c.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
+    fun panel(color: Int = 0xee123847.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
 
     /** Slanted racing button: dips when pressed, springs back. */
     @SuppressLint("ClickableViewAccessibility")
@@ -132,9 +133,14 @@ object Ui {
 
     @SuppressLint("ClickableViewAccessibility")
     fun makeButton(ctx: Context, label: String, color: Int, sizeSp: Float, round: Boolean, onClick: () -> Unit): TextView =
-        text(ctx, if (round) label else label.uppercase(), sizeSp * 0.8f).apply {
+        text(ctx, label, sizeSp * 0.86f, outline = false).apply {
             (this as OutlinedText).square = round
-            val bg = ChunkyDrawable(color, dp(if (round) 200f else 7f), lip = dp(4f), slant = if (round) 0f else dp(12f))
+            typeface = fontPlain
+            minHeight = dpi(48f)
+            minWidth = dpi(48f)
+            isFocusable = true
+            setOnClickListener { onClick() }
+            val bg = ChunkyDrawable(color, dp(if (round) 200f else 20f), lip = dp(4f))
             background = bg
             // round buttons get slim vertical padding: a TextView whose text overflows scrolls, and that
             // would shift the background up and clip the bottom of the circle
@@ -145,7 +151,7 @@ object Ui {
                     MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.94f).scaleY(0.94f).translationY(dp(2f)).setDuration(60).start()
                     MotionEvent.ACTION_UP -> {
                         v.animate().scaleX(1f).scaleY(1f).translationY(0f).setInterpolator(OvershootInterpolator(2f)).setDuration(200).start()
-                        if (e.x in 0f..v.width.toFloat() && e.y in 0f..v.height.toFloat()) onClick()
+                        if (e.x in 0f..v.width.toFloat() && e.y in 0f..v.height.toFloat()) v.performClick()
                     }
                     MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).translationY(0f).setDuration(120).start()
                 }
