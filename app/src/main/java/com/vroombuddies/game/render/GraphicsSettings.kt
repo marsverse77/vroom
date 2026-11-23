@@ -17,21 +17,25 @@ enum class Level(val label: String) { OFF("Off"), LOW("Low"), MEDIUM("Medium"), 
 class GraphicsSettings(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("graphics", Context.MODE_PRIVATE)
 
-    var antiAliasing = AaMode.valueOf(prefs.getString("aa", AaMode.MSAA.name)!!)
-    var shadows = Level.valueOf(prefs.getString("shadows", Level.HIGH.name)!!)
-    var ssao = Level.valueOf(prefs.getString("ssao", Level.MEDIUM.name)!!)
-    var textureQuality = Level.valueOf(prefs.getString("tex", Level.HIGH.name)!!)
-    var anisotropic = Level.valueOf(prefs.getString("aniso", Level.HIGH.name)!!)
+    var antiAliasing = pick("aa", AaMode.MSAA)
+    var shadows = pick("shadows", Level.HIGH)
+    var ssao = pick("ssao", Level.MEDIUM)
+    var textureQuality = pick("tex", Level.HIGH)
+    var anisotropic = pick("aniso", Level.HIGH)
     var bloom = prefs.getBoolean("bloom", true)
     var reflections = prefs.getBoolean("ssr", false)
     var motionBlur = prefs.getBoolean("mblur", true)
     var godRays = prefs.getBoolean("godrays", true)
     var depthOfField = prefs.getBoolean("dof", true)
-    var effects = Level.valueOf(prefs.getString("fx", Level.HIGH.name)!!)
+    var effects = pick("fx", Level.HIGH)
     var foliageWind = prefs.getBoolean("wind", true)
     var dynamicResolution = prefs.getBoolean("dynres", true)
     var fog = prefs.getBoolean("fog", true)
-    var targetFps = prefs.getInt("fps", 60)
+    var targetFps = prefs.getInt("fps", 60).let { if (it == 30 || it == 60 || it == 120) it else 60 }
+
+    /** A saved choice that no longer exists (or a damaged file) falls back to the default instead of crashing. */
+    private inline fun <reified T : Enum<T>> pick(key: String, def: T): T =
+        try { prefs.getString(key, null)?.let { enumValueOf<T>(it) } ?: def } catch (t: Throwable) { def }
 
     fun save() = prefs.edit()
         .putString("aa", antiAliasing.name).putString("shadows", shadows.name).putString("ssao", ssao.name)

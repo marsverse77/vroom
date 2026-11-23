@@ -23,7 +23,11 @@ import kotlin.concurrent.thread
  * Flow: loading (compile shaders once) -> title -> car -> paint -> track -> race -> result.
  */
 class GameActivity : Activity(), MenuHost {
-    companion object { init { Utils.init() } }
+    companion object {
+        init { Utils.init() }
+        private const val BOOTING = "booting"
+        private const val LOADING_RACE = "loadingRace"
+    }
 
     private lateinit var surface: SurfaceView
     private lateinit var overlay: FrameLayout
@@ -82,6 +86,7 @@ class GameActivity : Activity(), MenuHost {
         setContentView(root)
         hideSystemUi()
 
+        recoverFromCrash()
         settings = GraphicsSettings(this)
         pickDisplayMode()
         choreographer = Choreographer.getInstance()
@@ -108,12 +113,11 @@ class GameActivity : Activity(), MenuHost {
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
                 mats.create(engine, pkgs)
-                // start compiling every shader variant now (in the background where the GPU driver allows),
-                // so the first spark, boost or jump never pauses the game to build a shader
-                mats.prewarm()
                 postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
                 toTitle()
+                // the game reached the title screen and drew for a few seconds: this launch is healthy
+                overlay.postDelayed({ boot.edit().putBoolean(BOOTING, false).apply() }, 3000)
             }
         }
     }
@@ -147,6 +151,24 @@ class GameActivity : Activity(), MenuHost {
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
+    private val boot by lazy { getSharedPreferences("boot", MODE_PRIVATE) }
+
+    /**
+     * Crash guard. If the last launch never reached the title screen, or the last race crashed while
+     * loading, start this time with default graphics settings (and rebuilt shaders after a startup crash)
+     * instead of crashing the same way again.
+     */
+    private fun recoverFromCrash() {
+        try {
+            if (boot.getBoolean(BOOTING, false) || boot.getBoolean(LOADING_RACE, false)) {
+                Log.w("Vroom", "previous run crashed while loading: resetting graphics settings")
+                getSharedPreferences("graphics", MODE_PRIVATE).edit().clear().commit()
+            }
+            if (boot.getBoolean(BOOTING, false)) java.io.File(filesDir, "materials").deleteRecursively()
+            boot.edit().putBoolean(BOOTING, true).putBoolean(LOADING_RACE, false).commit()
+        } catch (t: Throwable) { Log.w("Vroom", "crash guard", t) }
+    }
+
     override fun applySettings() { settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
 
     /**
@@ -175,6 +197,7 @@ class GameActivity : Activity(), MenuHost {
         setScreen(Menus.loading(this, "Building ${Themes.all[themeIndex].name}..."))
         // let the loading screen draw before the heavy build
         overlay.postDelayed({
+            boot.edit().putBoolean(LOADING_RACE, true).commit()
             showroom?.destroy(); showroom = null
             game?.destroy()
             settings.apply(view, renderer)
@@ -267,6 +290,7 @@ class GameActivity : Activity(), MenuHost {
                 if (settings.depthOfField) settings.setDof(view, true, 8f, camera)
                 if (--warmFrames == 0) {
                     g.warming = false; g.post.force = false
+                    boot.edit().putBoolean(LOADING_RACE, false).apply()
                     settings.setDof(view, false, 8f, camera)
                     showHud()
                 }
