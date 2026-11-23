@@ -176,6 +176,7 @@ class TrackMapView(ctx: Context, shape: TrackShape, private val road: Int) : Vie
 @SuppressLint("ClickableViewAccessibility", "ViewConstructor")
 class HoldButton(ctx: Context, private val label: String, private val color: Int, private val holdSeconds: Float = 1.6f, private val onDone: () -> Unit) : AnimatedView(ctx) {
     private var holding = false; private var fill = 0f; private var fired = false
+    private val rf = RectF()
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Ui.font; textAlign = Paint.Align.CENTER; color = Color.WHITE }
     init {
@@ -191,14 +192,73 @@ class HoldButton(ctx: Context, private val label: String, private val color: Int
         fill = if (holding) min(1f, fill + dt / holdSeconds) else max(0f, fill - dt * 3f)
         if (fill >= 1f && !fired) { fired = true; holding = false; fill = 0f; onDone() }
         val cx = width / 2f; val cy = height / 2f; val r = min(cx, cy) - Ui.dp(8f)
-        p.style = Paint.Style.FILL; p.color = 0x55000000; c.drawCircle(cx, cy + Ui.dp(4f), r, p)
-        p.color = color; c.drawCircle(cx, cy, r, p)
-        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(4f); p.color = Color.WHITE; c.drawCircle(cx, cy, r, p)
+        rf.set(cx - r, cy - r, cx + r, cy + r + Ui.dp(5f))
+        Ui.drawChunky(c, rf, r, color, lip = Ui.dp(6f), p = p)
+        p.shader = null; p.style = Paint.Style.STROKE
         if (fill > 0f) {
             p.strokeWidth = Ui.dp(7f); p.color = Ui.YELLOW; p.strokeCap = Paint.Cap.ROUND
-            c.drawArc(cx - r + Ui.dp(7f), cy - r + Ui.dp(7f), cx + r - Ui.dp(7f), cy + r - Ui.dp(7f), -90f, 360f * fill, false, p)
+            c.drawArc(cx - r + Ui.dp(9f), cy - r + Ui.dp(9f), cx + r - Ui.dp(9f), cy + r - Ui.dp(9f), -90f, 360f * fill, false, p)
         }
+        p.style = Paint.Style.FILL
+        txt.textSize = r * 0.95f; txt.style = Paint.Style.STROKE; txt.strokeWidth = Ui.dp(5f); txt.color = Ui.INK; txt.strokeJoin = Paint.Join.ROUND
+        c.drawText(label, cx, cy + txt.textSize * 0.35f, txt)
+        txt.style = Paint.Style.FILL; txt.color = Color.WHITE
         txt.textSize = r * 0.95f
         c.drawText(label, cx, cy + txt.textSize * 0.35f, txt)
     }
+}
+
+/** Slanted ribbon behind titles: ink outline, darker lip, glossy body. Leaning shapes read as "fast". */
+class BannerDrawable(private val color: Int, private val lean: Float = Ui.dp(18f)) : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val path = Path()
+    private fun para(l: Float, t: Float, r: Float, b: Float) {
+        path.reset(); path.moveTo(l + lean, t); path.lineTo(r, t); path.lineTo(r - lean, b); path.lineTo(l, b); path.close()
+    }
+    override fun draw(c: Canvas) {
+        val b = bounds; val o = Ui.dp(3.5f); val lip = Ui.dp(5f)
+        val l = b.left.toFloat(); val t = b.top.toFloat(); val r = b.right.toFloat(); val bt = b.bottom.toFloat()
+        p.pathEffect = CornerPathEffect(Ui.dp(8f))
+        p.shader = null; p.color = Ui.INK; para(l, t, r, bt); c.drawPath(path, p)
+        p.color = Ui.darken(color, 0.38f); para(l + o, t + o, r - o, bt - o); c.drawPath(path, p)
+        p.shader = LinearGradient(0f, t, 0f, bt - lip, Ui.lighten(color, 0.22f), color, Shader.TileMode.CLAMP)
+        para(l + o, t + o, r - o, bt - o - lip); c.drawPath(path, p); p.shader = null
+        p.color = 0x44ffffff; val gh = (bt - t) * 0.3f; para(l + o + lean * 0.6f, t + o + Ui.dp(2f), r - o - lean, t + o + Ui.dp(2f) + gh); c.drawPath(path, p)
+    }
+    override fun setAlpha(alpha: Int) {}
+    override fun setColorFilter(cf: ColorFilter?) {}
+    @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
+}
+
+/** Chequered racing strip that scrolls sideways, used along screen edges. */
+class CheckerStripView(ctx: Context, private val speed: Float = 1f) : AnimatedView(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    override fun draw(c: Canvas, dt: Float) {
+        val h = height.toFloat(); val sq = h / 2; val off = (time * speed * Ui.dp(120f)) % (sq * 2)
+        p.color = Ui.INK; c.drawRect(0f, 0f, width.toFloat(), h, p)
+        p.color = Color.WHITE
+        var x = -sq * 2 + off
+        while (x < width) {
+            c.drawRect(x, 0f, x + sq, sq, p); c.drawRect(x + sq, sq, x + sq * 2, h, p)
+            x += sq * 2
+        }
+    }
+}
+
+/** Track picker card: theme sky gradient body with lip, ink outline and gloss. */
+class TileDrawable(private val top: Int, private val mid: Int, private val bottom: Int, private val radius: Float = Ui.dp(26f)) : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val r = RectF()
+    override fun draw(c: Canvas) {
+        val o = Ui.dp(4f); val lip = Ui.dp(8f)
+        r.set(bounds); p.shader = null; p.color = Ui.INK; c.drawRoundRect(r, radius, radius, p)
+        r.inset(o, o); p.color = Ui.darken(bottom, 0.4f); c.drawRoundRect(r, radius - o, radius - o, p)
+        r.bottom -= lip
+        p.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(top, mid, bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        c.drawRoundRect(r, radius - o, radius - o, p); p.shader = null
+        // inner white rim for a sticker look
+        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(3f); p.color = 0x99ffffff.toInt()
+        r.inset(Ui.dp(4f), Ui.dp(4f)); c.drawRoundRect(r, radius - o * 2, radius - o * 2, p); p.style = Paint.Style.FILL
+    }
+    override fun setAlpha(alpha: Int) {}
+    override fun setColorFilter(cf: ColorFilter?) {}
+    @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
 }

@@ -59,7 +59,7 @@ class GameActivity : Activity(), MenuHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Ui.density = resources.displayMetrics.density
+        Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
         overlay = FrameLayout(this)
@@ -155,7 +155,7 @@ class GameActivity : Activity(), MenuHost {
         root.addView(r, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 168f, b = 16f))
         val b = BoostButton(this)
         root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
-        root.addView(Ui.button(this, "⏸", Ui.PURPLE, 22f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
+        root.addView(Ui.roundButton(this, "⏸", Ui.PURPLE, 20f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
         setScreen(root, swoosh = false)
         hud = h; left = l; right = r; boostBtn = b
     }
@@ -163,12 +163,11 @@ class GameActivity : Activity(), MenuHost {
     private fun pause() {
         if (paused || game == null) return
         paused = true
-        val box = Ui.col(this)
-        box.addView(Ui.text(this, "Paused", 56f))
-        box.addView(Ui.button(this, "▶  Keep racing", Ui.GREEN, 30f) { click(); paused = false; overlay.removeView(box.parent as android.view.View) })
-        box.addView(Ui.button(this, "🔁  Start again", Ui.BLUE, 26f) { click(); startRace(themeIndex) })
-        box.addView(Ui.button(this, "🏠  Home", Ui.ORANGE, 26f) { click(); paused = false; toTitle() })
-        val shade = Ui.frame(this).apply { setBackgroundColor(0x88000000.toInt()); addView(box, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)) }
+        lateinit var shade: android.view.View
+        shade = Menus.pause(this,
+            onResume = { click(); paused = false; overlay.removeView(shade) },
+            onRestart = { click(); startRace(themeIndex) },
+            onHome = { click(); paused = false; toTitle() })
         overlay.addView(shade, FrameLayout.LayoutParams(-1, -1))
     }
 

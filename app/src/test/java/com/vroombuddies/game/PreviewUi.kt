@@ -54,7 +54,7 @@ class PreviewUi {
     fun export() {
         Assume.assumeTrue(dirName != null)
         act = Robolectric.buildActivity(Activity::class.java).setup().get()
-        Ui.density = act.resources.displayMetrics.density
+        Ui.init(act)
         val w = act.resources.displayMetrics.widthPixels; val h = act.resources.displayMetrics.heightPixels
         val gs = GraphicsSettings(act)
         val host = object : MenuHost {
@@ -71,6 +71,8 @@ class PreviewUi {
         save(Menus.paintPicker(act, host, 3), w, h, "ui_paint")
         save(Menus.trackPicker(act, host), w, h, "ui_tracks")
         save(Menus.settings(act, host), w, h, "ui_settings")
+        save(Menus.pause(act, {}, {}, {}), w, h, "ui_pause")
+        save(Menus.loading(act, "Building Sunny Meadow..."), w, h, "ui_loading")
 
         // HUD exactly as GameActivity lays it out, fed from the exported race state
         for (shot in listOf("race_start", "race_chase", "race_jump", "race_tires")) {
@@ -92,12 +94,13 @@ class PreviewUi {
             root.addView(r, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 168f, b = 16f))
             val b = BoostButton(act).apply { energy = if (shot == "race_chase") 70f else st.energy.coerceAtLeast(40f); boosting = st.boosting }
             root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
-            root.addView(Ui.button(act, "⏸", Ui.PURPLE, 22f) {}, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
+            root.addView(Ui.roundButton(act, "⏸", Ui.PURPLE, 20f) {}, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
             hud.tick(0.016f); if (shot != "race_start") hud.tick(2f); b.tick(0.3f)
             save(root, w, h, "hud_$shot")
         }
         val win = FrameLayout(act).apply { addView(ResultView(act, 1, 3, {}, {}, {}, {}), FrameLayout.LayoutParams(-1, -1)) }
         save(win, w, h, "ui_win")
+        save(FrameLayout(act).apply { addView(ResultView(act, 2, 2, {}, {}, {}, {}), FrameLayout.LayoutParams(-1, -1)) }, w, h, "ui_second")
 
         val t = Themes.all[0]
         png(Textures.roadBitmap(t.road, t.kerbs.first, t.kerbs.second), "tex_ROAD")
