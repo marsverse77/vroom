@@ -330,6 +330,7 @@ object Menus {
         s.bloom = true
         s.reflections = p == Preset.MAX
         s.motionBlur = p != Preset.SMOOTH
+        s.godRays = p != Preset.SMOOTH
         s.depthOfField = p == Preset.PRETTY || p == Preset.MAX
         s.foliageWind = p != Preset.SMOOTH
         s.fog = true
@@ -388,6 +389,7 @@ object Menus {
         option("Shadows", "Soft shadows from the sun", levels, { s.shadows }, { s.shadows = it }) { it.label }
         option("Ambient occlusion (SSAO)", "Soft contact shadows where things meet", levels, { s.ssao }, { s.ssao = it }) { it.label }
         option("Bloom and lens flare", "Glow around bright lights and boosts", onOff, { s.bloom }, { s.bloom = it }, ::b)
+        option("God rays", "Sunbeams through the sky", onOff, { s.godRays }, { s.godRays = it }, ::b)
         option("Reflections (SSR)", "Shiny reflections on the road", onOff, { s.reflections }, { s.reflections = it }, ::b)
         option("Fog and atmosphere", "Distance haze", onOff, { s.fog }, { s.fog = it }, ::b)
 

@@ -88,7 +88,8 @@ class PreviewExport {
         val dirName = System.getenv("PREVIEW_DIR")
         Assume.assumeTrue(dirName != null)
         val dir = File(dirName!!).apply { mkdirs() }
-        val theme = Themes.all[0]
+        // PREVIEW_THEME / PREVIEW_CAR pick another track or car (defaults: the first of each)
+        val theme = Themes.all[System.getenv("PREVIEW_THEME")?.toIntOrNull() ?: 0]
         val track = TrackPath(theme.shape)
 
         // ---- static world (track + scenery), shared by every race shot
@@ -100,7 +101,7 @@ class PreviewExport {
 
         // ---- race moments from the real simulation
         val paints = Paints.all
-        val design = CarDesigns.all[0]
+        val design = CarDesigns.all[System.getenv("PREVIEW_CAR")?.toIntOrNull() ?: 0]
         val playerPaint = paints[0]
         val aiPaints = paints.filter { it.color != playerPaint.color && !it.rainbow }.shuffled(kotlin.random.Random(theme.shape.seed))
         val designs = CarDesigns.all
