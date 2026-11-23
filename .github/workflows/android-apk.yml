@@ -1,5 +1,8 @@
 name: Android APK
-on: [pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [fix/showroom-sky-mipmaps]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
