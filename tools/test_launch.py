@@ -25,6 +25,9 @@ def wait_label(text, exact=False):
         result = adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
         if b"dumped" in result.lower():
             root = ET.fromstring(adb("exec-out", "cat", "/sdcard/window.xml"))
+            if any("Opening the garage" in n.get("text","") for n in root.iter("node")):
+                time.sleep(0.5)
+                continue
             for n in root.iter("node"):
                 if (n.get("text", "") == text if exact else text in n.get("text", "")) and n.get("package") == PACKAGE:
                     left, top, right, bottom = map(int, re.findall(r"\d+", n.get("bounds")))

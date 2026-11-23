@@ -60,6 +60,7 @@ class GameActivity : Activity(), MenuHost {
     private var lastNanos = 0L
     private var vsyncs = 0
     private var frames = 0
+    private var garageVisible = false
     private var showroomDrawn = false
     private var raceDrawn = false
 
@@ -134,12 +135,49 @@ class GameActivity : Activity(), MenuHost {
     private fun ensureShowroom() {
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
         sound.menuMusic()
+        if (showroom == null) garageVisible = false
         if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings, resources).also { it.setAspect(aspect) }
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
     override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
-    override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.carPicker(this, this, carIndex)) }
+    override fun toCarPicker() {
+        ensureShowroom()
+        showroom!!.offsetX = 0f
+        showroom!!.offsetY = 0.10f
+        val picker = Menus.carPicker(this, this, carIndex) as FrameLayout
+        setScreen(picker)
+        if (!garageVisible) revealGarage(picker)
+    }
+
+    /** Keep the illustrated cover up until the separate SurfaceView actually presents a garage frame. */
+    private fun revealGarage(picker: FrameLayout) {
+        val cover = Menus.loading(this, "Opening the garage…")
+        cover.isClickable = true
+        picker.addView(cover, FrameLayout.LayoutParams(-1,-1))
+        val sample = android.graphics.Bitmap.createBitmap(16,12,android.graphics.Bitmap.Config.ARGB_8888)
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val deadline = android.os.SystemClock.elapsedRealtime() + 12000
+        fun poll() {
+            if (!cover.isAttachedToWindow) return
+            if (!surface.holder.surface.isValid || !uiHelper.isReadyToRender) {
+                cover.postDelayed({ poll() },160)
+                return
+            }
+            PixelCopy.request(surface,sample,{ result ->
+                if (!cover.isAttachedToWindow) return@request
+                val visible = result == PixelCopy.SUCCESS && (2 until 10).any { y ->
+                    val rgb = sample.getPixel(8,y)
+                    android.graphics.Color.red(rgb) + android.graphics.Color.green(rgb) + android.graphics.Color.blue(rgb) > 120
+                }
+                if (visible || android.os.SystemClock.elapsedRealtime() >= deadline) {
+                    garageVisible = visible
+                    cover.animate().alpha(0f).setDuration(180).withEndAction { picker.removeView(cover) }.start()
+                } else cover.postDelayed({ poll() },160)
+            },handler)
+        }
+        cover.post { poll() }
+    }
     override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
     override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }

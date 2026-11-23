@@ -450,20 +450,24 @@ object Menus {
         root.background = android.graphics.drawable.GradientDrawable(
             android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
             intArrayOf(0xff278bc2.toInt(), 0xff4252a2.toInt()))
-        val col = Ui.col(ctx)
+        root.addView(harborCover(ctx), FrameLayout.LayoutParams(-1,-1))
+        val col = Ui.col(ctx).apply {
+            background = Ui.panel(0xef205585.toInt(),20f)
+            setPadding(Ui.dpi(14f),Ui.dpi(7f),Ui.dpi(14f),Ui.dpi(12f))
+        }
         val badge = android.widget.ImageView(ctx).apply {
             setImageResource(com.vroombuddies.game.R.drawable.wordmark)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             contentDescription = "Vroom Buddies"
         }
-        val width = (ctx.resources.configuration.screenWidthDp * 0.47f).coerceIn(160f, 360f)
+        val width = (ctx.resources.configuration.screenWidthDp * 0.28f).coerceIn(145f, 240f)
         col.addView(badge, lp(Ui.dpi(width), Ui.dpi(width * 0.38f)))
         col.addView(Ui.text(ctx, msg, 19f, outline = false), lp(t = 12f))
         val progress = android.widget.ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
         progress.isIndeterminate = true
         progress.indeterminateTintList = android.content.res.ColorStateList.valueOf(Ui.GOLD)
         col.addView(progress, lp(Ui.dpi(width * 0.68f), Ui.dpi(8f), t = 10f))
-        root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(col, Ui.lp(-2,-2,Gravity.BOTTOM or Gravity.START,l=16f,b=14f))
         return root
     }
 }
