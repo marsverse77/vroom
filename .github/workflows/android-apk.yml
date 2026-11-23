@@ -23,3 +23,17 @@ jobs:
           name: VroomBuddies-fixed
           path: VroomBuddies-fixed.apk
       - run: bash gradlew :app:testDebugUnitTest
+      - name: Enable emulator acceleration
+        run: sudo chmod a+rw /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          emulator-boot-timeout: 300
+          script: python3 tools/test_launch.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-check
+          path: launch-check/

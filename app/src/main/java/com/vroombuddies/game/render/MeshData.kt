@@ -42,6 +42,19 @@ class MeshData {
     fun append(o: MeshData, m: FloatArray? = null, tint: Rgba? = null) {
         val base = vCount
         growV(o.vCount)
+        // For our rotation × scale matrices, the inverse-transpose divides each
+        // matrix column by its squared length. Glossy stretched panels then reflect evenly.
+        val normalMatrix = m?.copyOf()
+        if (normalMatrix != null) {
+            for (column in 0 until 3) {
+                val offset = column * 4
+                val x = normalMatrix[offset]
+                val y = normalMatrix[offset + 1]
+                val z = normalMatrix[offset + 2]
+                val squaredLength = (x * x + y * y + z * z).coerceAtLeast(1e-12f)
+                for (axis in 0 until 3) normalMatrix[offset + axis] /= squaredLength
+            }
+        }
         for (i in 0 until o.vCount) {
             var x = o.pos[i * 3]; var y = o.pos[i * 3 + 1]; var z = o.pos[i * 3 + 2]
             var nx = o.nrm[i * 3]; var ny = o.nrm[i * 3 + 1]; var nz = o.nrm[i * 3 + 2]
@@ -50,10 +63,10 @@ class MeshData {
                 val ty = m[1] * x + m[5] * y + m[9] * z + m[13]
                 val tz = m[2] * x + m[6] * y + m[10] * z + m[14]
                 x = tx; y = ty; z = tz
-                // normals: assumes uniform-ish scale; renormalise
-                val qx = m[0] * nx + m[4] * ny + m[8] * nz
-                val qy = m[1] * nx + m[5] * ny + m[9] * nz
-                val qz = m[2] * nx + m[6] * ny + m[10] * nz
+                val n = requireNotNull(normalMatrix)
+                val qx = n[0] * nx + n[4] * ny + n[8] * nz
+                val qy = n[1] * nx + n[5] * ny + n[9] * nz
+                val qz = n[2] * nx + n[6] * ny + n[10] * nz
                 val l = sqrt(qx * qx + qy * qy + qz * qz).coerceAtLeast(1e-6f)
                 nx = qx / l; ny = qy / l; nz = qz / l
             }
