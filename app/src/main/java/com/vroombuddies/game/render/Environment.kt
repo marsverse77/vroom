@@ -52,12 +52,9 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
         sunDir[0] = -cos(el) * cos(az); sunDir[1] = -sin(el); sunDir[2] = -cos(el) * sin(az)
         val n = sqrt(sunDir[0] * sunDir[0] + sunDir[1] * sunDir[1] + sunDir[2] * sunDir[2])
         for (i in 0..2) sunDir[i] /= n
-        android.util.Log.i("Vroom", "Startup: buildSun")
-        if (!probe("sun")) buildSun(shadowMapSize, cascades)
-        android.util.Log.i("Vroom", "Startup: buildSkyDome")
+        buildSun(shadowMapSize, cascades)
         buildSkyDome()
-        android.util.Log.i("Vroom", "Startup: buildIbl")
-        if (!probe("ibl")) buildIbl()
+        buildIbl()
     }
 
     fun buildSun(shadowMapSize: Int, cascades: Int) {
@@ -160,18 +157,14 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
             .usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
             .format(Texture.InternalFormat.RGBA16F).build(engine)
         equirect.setImage(engine, 0, Texture.PixelBufferDescriptor(buf, Texture.Format.RGBA, Texture.Type.HALF))
-        android.util.Log.i("Vroom", "Startup: val ctx")
         val ctx = IBLPrefilterContext(engine)
         val toCube = IBLPrefilterContext.EquirectangularToCubemap(ctx)
-        android.util.Log.i("Vroom", "Startup: val cube")
         val cube = toCube.run(equirect)
         val spec = IBLPrefilterContext.SpecularFilter(ctx)
-        android.util.Log.i("Vroom", "Startup: reflections")
         reflections = spec.run(cube)
         spec.destroy(); toCube.destroy(); ctx.destroy()
         engine.destroyTexture(equirect); engine.destroyTexture(cube)
 
-        android.util.Log.i("Vroom", "Startup: ibl")
         ibl = IndirectLight.Builder()
             .reflections(reflections!!)
             .irradiance(3, fitIrradianceSH())

@@ -24,14 +24,11 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
     var offsetY = 0f
 
     init {
-        android.util.Log.i("Vroom", "Startup: env.build")
-        env.build(settings.shadowMapSize, settings.shadowCascades)
-        android.util.Log.i("Vroom", "Startup: env.applyFog")
+        env.build(settings.shadowMapSize.coerceAtMost(1024), 1)
         env.applyFog(view, false)
         val m = MeshData()
         Prims.cylinder(m, 5.2f, 5.4f, 0.5f, Rgba.hex(0xffffff), Mat.trs(0f, -0.25f, 0f), 48)
         Prims.torus(m, 5.3f, 0.18f, Rgba.hex(0xffd23f), Mat.trs(0f, 0.02f, 0f, rx = (PI / 2).toFloat()), 8, 48)
-        android.util.Log.i("Vroom", "Startup: val g")
         val g = Gpu.upload(engine, m).also { meshes.add(it) }
         val mi = mats.lit.createInstance().also {
             it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.25f); it.setParameter("metallic", 0f)
@@ -46,17 +43,14 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         val rng = com.vroombuddies.game.sim.Rng(4)
         for (i in 0 until 26) { val a = rng.f() * 6.28f; val r = 22f + rng.f() * 40f; f.append(gb.lit, Mat.trs(cos(a) * r, -0.5f, sin(a) * r - 10f, ry = rng.f() * 6f, sx = 1.2f, sy = 1.2f, sz = 1.2f), Rgba.hex(0x5cc160)) }
         for (i in 0 until 160) { val a = rng.f() * 6.28f; val r = 7f + rng.f() * 25f; f.append(bush.lit, Mat.trs(cos(a) * r, -0.5f, sin(a) * r, ry = rng.f() * 6f), Rgba.hex(listOf(0xff5fa2, 0xffffff, 0xffe14d, 0x8a7dff)[rng.int(4)])) }
-        android.util.Log.i("Vroom", "Startup: val fg")
         val fg = Gpu.upload(engine, f).also { meshes.add(it) }
         val fmi = mats.lit.createInstance().also {
             it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.85f); it.setParameter("metallic", 0f)
             it.setParameter("emissive", 0f, 0f, 0f, 0f); it.setParameter("wind", 1f); mis.add(it)
         }
         val fe = Gpu.renderable(engine, fg, fmi); ents.add(fe); scene.addEntity(fe)
-        android.util.Log.i("Vroom", "Startup: grading")
         grading = ColorGrading.Builder().toneMapper(ToneMapper.Agx()).saturation(1.2f).vibrance(1.15f).build(engine)
         view.colorGrading = grading
-        android.util.Log.i("Vroom", "Startup: setCar")
         setCar(design, paint)
     }
 
@@ -79,14 +73,11 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         spinBoost = max(0f, spinBoost - dt)
         val a = t * 0.5f + spinBoost * spinBoost * 4f
         val hop = abs(sin(t * 2.2f)) * 0.05f
-        if (t == dt) android.util.Log.i("Vroom", "update car")
         car?.update(Mat.trs(0f, hop, 0f, 0f, a, 0f), 0f, 0f, 0f, sin(t) * 0.3f, t * 4f, 0f, t, false)
         val ex = 6.6f; val ey = 2.6f; val ez = 6.6f
-        if (t == dt) android.util.Log.i("Vroom", "update camera")
         camera.setProjection(38.0, aspect.toDouble(), 0.3, 3000.0, Camera.Fov.VERTICAL)
         camera.setShift(offsetX.toDouble(), offsetY.toDouble())
         camera.lookAt(ex.toDouble(), ey.toDouble(), ez.toDouble(), 0.0, 0.9, 0.0, 0.0, 1.0, 0.0)
-        if (t == dt) android.util.Log.i("Vroom", "update environment")
         env.follow(ex, ey, ez)
         settings.setDof(view, false, 12f, camera)
     }

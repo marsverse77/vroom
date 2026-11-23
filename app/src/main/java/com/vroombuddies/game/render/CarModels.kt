@@ -185,7 +185,6 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
     val paintMi: MaterialInstance
 
     init {
-        android.util.Log.i("Vroom", "car geometry built")
         val tm = engine.transformManager
         tm.create(root); tm.create(body, tm.getInstance(root))
         paintMi = mats.paint.createInstance().also { mis.add(it) }
@@ -195,7 +194,6 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
         val lightMi = mats.glow.createInstance().also { it.setParameter("color", 6f, 6f, 6f, 1f); mis.add(it) }
         addPart(parts.paint, paintMi, body); addPart(parts.trim, trimMi, body); addPart(parts.glass, glassMi, body)
         addPart(parts.lights, lightMi, body, shadows = false)
-        android.util.Log.i("Vroom", "car body uploaded")
         val wheelMesh = Gpu.upload(engine, parts.wheel).also { meshes.add(it) }
         val wheelMi = lit(mats, 0.55f, 0f)
         for (i in 0 until 4) {
@@ -203,7 +201,6 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
             tm.create(e, tm.getInstance(root)); wheels[i] = e; ents.add(e); scene.addEntity(e)
         }
         // boost flames: inner white-yellow core + outer orange cone
-        android.util.Log.i("Vroom", "wheels uploaded")
         val fm = MeshData()
         Prims.cone(fm, 0.23f, 1.48f, Rgba(0.03f, 0.60f, 0.88f), Mat.trs(0f, 0f, -0.8f, rx = (-PI / 2).toFloat()))
         Prims.cone(fm, 0.14f, 1.75f, Rgba(0.72f, 1f, 0.94f), Mat.trs(0f, 0f, -0.5f, rx = (-PI / 2).toFloat()))
@@ -220,7 +217,6 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
             scene.addEntity(boostLight)
         }
         scene.addEntity(root)
-        android.util.Log.i("Vroom", "car ready")
     }
 
     private fun lit(mats: MaterialLib, rough: Float, metal: Float) = mats.lit.createInstance().also {

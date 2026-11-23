@@ -164,7 +164,6 @@ class MaterialLib(private val ctx: Context) {
                     .optimization(Optimization.PERFORMANCE)
                     .variantFilter(variantFilter)
                     .material(spec.source.trimIndent())
-                android.util.Log.i("Vroom", "Startup: val pkg")
                 val pkg = spec.configure(b).build()
                 check(pkg.isValid) { "material ${spec.name} failed to compile" }
                 val buf = pkg.buffer
@@ -190,18 +189,6 @@ class MaterialLib(private val ctx: Context) {
         particleAdd = mk("particleAdd"); particleAlpha = mk("particleAlpha")
         fun opt(n: String): Material? = if (pkgs.containsKey(n)) try { mk(n) } catch (t: Throwable) { null } else null
         water = opt("water"); postFx = opt("postFx")
-    }
-
-    /**
-     * Queue every shader variant the game can use for compiling now. Filament compiles them on its own
-     * threads where the driver supports it; otherwise this is a no-op and the warm-up frames in the
-     * activity (drawn behind the loading screen) do the job.
-     */
-    fun prewarm() {
-        val variants = Material.UserVariantFilterBit.ALL and variantFilter.inv()
-        for (m in listOfNotNull(lit, paint, textured, glow, glowTex, particleAdd, particleAlpha, water, postFx)) {
-            try { m.compile(Material.CompilerPriorityQueue.HIGH, variants, null, null) } catch (t: Throwable) { android.util.Log.w("Vroom", "prewarm", t) }
-        }
     }
 
     companion object { const val VERSION = "filament-1.81.0-v1" }

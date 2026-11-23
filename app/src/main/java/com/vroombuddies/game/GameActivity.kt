@@ -59,8 +59,9 @@ class GameActivity : Activity(), MenuHost {
     private var keyLeft = false; private var keyRight = false; private var keyBoost = false
     private var lastNanos = 0L
     private var vsyncs = 0
-    private var loggedFrame = false
     private var frames = 0
+    private var showroomDrawn = false
+    private var raceDrawn = false
 
     private fun followRefreshRate() {
         @Suppress("DEPRECATION")
@@ -73,7 +74,6 @@ class GameActivity : Activity(), MenuHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        System.setProperty("vroom.probe", intent.getStringExtra("probe") ?: "")
         Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
@@ -90,9 +90,7 @@ class GameActivity : Activity(), MenuHost {
         displayHelper = DisplayHelper(this)
         uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
         uiHelper.renderCallback = SurfaceCallback()
-        uiHelper.attachTo(surface)
 
-        android.util.Log.i("Vroom", "Startup: engine")
         engine = Engine.create()
         renderer = engine.createRenderer()
         scene = engine.createScene()
@@ -102,26 +100,17 @@ class GameActivity : Activity(), MenuHost {
         view.blendMode = View.BlendMode.OPAQUE
         renderer.clearOptions = Renderer.ClearOptions().apply { clear = true; clearColor = doubleArrayOf(0.3, 0.6, 0.95, 1.0) }
         camera.setExposure(1f)
-        android.util.Log.i("Vroom", "Startup: settings.apply")
         settings.apply(view, renderer)
 
+        uiHelper.attachTo(surface)
         mats = MaterialLib(this)
         setScreen(Menus.loading(this, "Getting the cars ready..."))
         thread(name = "materials") {
-            android.util.Log.i("Vroom", "Startup: val pkgs")
             val pkgs = try { mats.preparePackages { } } catch (t: Throwable) { Log.e("Vroom", "material build failed", t); null }
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
-                android.util.Log.i("Vroom", "Startup: mats.create")
                 mats.create(engine, pkgs)
-                // start compiling every shader variant now (in the background where the GPU driver allows),
-                // so the first spark, boost or jump never pauses the game to build a shader
-                android.util.Log.i("Vroom", "Startup: mats.prewarm")
-                if (!probe("warm")) mats.prewarm()
-                android.util.Log.i("Vroom", "Startup: postFx")
-                if (!probe("fx")) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
-                android.util.Log.i("Vroom", "Startup: toTitle")
                 toTitle()
             }
         }
@@ -186,8 +175,8 @@ class GameActivity : Activity(), MenuHost {
         overlay.postDelayed({
             showroom?.destroy(); showroom = null
             game?.destroy()
-            android.util.Log.i("Vroom", "Startup: settings.apply")
             settings.apply(view, renderer)
+            if (postFx == null) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
             // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
             // instead of letting the collector wake up in the middle of the race
@@ -292,26 +281,13 @@ class GameActivity : Activity(), MenuHost {
                     if (g.hud.phase == RacePhase.COUNTDOWN) countdownBeeps(g.hud.countdown)
                 }
                 hud?.tick(dt); boostBtn?.tick(dt)
-            } else {
-                if (frames < 1200 && !loggedFrame) Log.i("Vroom", "first showroom update")
-                showroom?.update(dt)
-            }
+            } else showroom?.update(dt)
             val sc = swapChain ?: return
-            if (!loggedFrame) Log.i("Vroom", "first beginFrame")
-            if (probe("empty") && !loggedFrame) view.scene = engine.createScene()
-            if (probe("post")) view.isPostProcessingEnabled = false
-            if (probe("unlit")) {
-                view.isShadowingEnabled = false
-                view.isPostProcessingEnabled = false
-                scene.indirectLight = null
-            }
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
-                if (!loggedFrame) Log.i("Vroom", "first render")
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
-                if (!loggedFrame) Log.i("Vroom", "first endFrame")
                 renderer.endFrame()
-                if (!loggedFrame) Log.i("Vroom", "Showroom frame submitted")
-                loggedFrame = true
+                if (g == null && !showroomDrawn) { showroomDrawn = true; Log.i("Vroom", "Showroom frame submitted") }
+                if (g != null && warmFrames == 0 && !raceDrawn) { raceDrawn = true; Log.i("Vroom", "Race frame submitted") }
             }
         }
     }
