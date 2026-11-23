@@ -164,6 +164,7 @@ class MaterialLib(private val ctx: Context) {
                     .optimization(Optimization.PERFORMANCE)
                     .variantFilter(variantFilter)
                     .material(spec.source.trimIndent())
+                android.util.Log.i("Vroom", "Startup: val pkg")
                 val pkg = spec.configure(b).build()
                 check(pkg.isValid) { "material ${spec.name} failed to compile" }
                 val buf = pkg.buffer

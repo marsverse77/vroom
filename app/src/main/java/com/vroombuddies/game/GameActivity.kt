@@ -90,6 +90,7 @@ class GameActivity : Activity(), MenuHost {
         uiHelper.renderCallback = SurfaceCallback()
         uiHelper.attachTo(surface)
 
+        android.util.Log.i("Vroom", "Startup: engine")
         engine = Engine.create()
         renderer = engine.createRenderer()
         scene = engine.createScene()
@@ -99,20 +100,26 @@ class GameActivity : Activity(), MenuHost {
         view.blendMode = View.BlendMode.OPAQUE
         renderer.clearOptions = Renderer.ClearOptions().apply { clear = true; clearColor = doubleArrayOf(0.3, 0.6, 0.95, 1.0) }
         camera.setExposure(1f)
+        android.util.Log.i("Vroom", "Startup: settings.apply")
         settings.apply(view, renderer)
 
         mats = MaterialLib(this)
         setScreen(Menus.loading(this, "Getting the cars ready..."))
         thread(name = "materials") {
+            android.util.Log.i("Vroom", "Startup: val pkgs")
             val pkgs = try { mats.preparePackages { } } catch (t: Throwable) { Log.e("Vroom", "material build failed", t); null }
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
+                android.util.Log.i("Vroom", "Startup: mats.create")
                 mats.create(engine, pkgs)
                 // start compiling every shader variant now (in the background where the GPU driver allows),
                 // so the first spark, boost or jump never pauses the game to build a shader
+                android.util.Log.i("Vroom", "Startup: mats.prewarm")
                 mats.prewarm()
+                android.util.Log.i("Vroom", "Startup: postFx")
                 postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
+                android.util.Log.i("Vroom", "Startup: toTitle")
                 toTitle()
             }
         }
@@ -177,6 +184,7 @@ class GameActivity : Activity(), MenuHost {
         overlay.postDelayed({
             showroom?.destroy(); showroom = null
             game?.destroy()
+            android.util.Log.i("Vroom", "Startup: settings.apply")
             settings.apply(view, renderer)
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
             // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
