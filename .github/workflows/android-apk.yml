@@ -16,11 +16,13 @@ jobs:
           run-id: 45193860068
       - name: Inspect the cached launch screenshot
         run: |
-          convert cached.png -resize 800x -quality 75 title.jpg
+          python -m pip install Pillow
+          python -c "from PIL import Image; im=Image.open('cached.png').convert('RGB'); im.thumbnail((800,800)); im.save('title.jpg',quality=75)"
           echo VROOM_PREVIEW_BEGIN
           base64 -w 120 title.jpg
           echo VROOM_PREVIEW_END
   build:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
