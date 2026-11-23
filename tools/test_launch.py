@@ -58,8 +58,10 @@ for launch in ("first", "cached"):
                     tap_label("▶", exact=True)
                 time.sleep(1)
                 (OUT / f"car-{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
-            for label in ("Next", "Next", "01"):
+            for screen, label in (("paint", "Next"), ("tracks", "Next"), ("grid", "01")):
                 tap_label(label)
+                if screen != "grid":
+                    (OUT / f"{screen}.png").write_bytes(adb("exec-out", "screencap", "-p"))
             deadline = time.monotonic() + 100
             while time.monotonic() < deadline:
                 if not running():

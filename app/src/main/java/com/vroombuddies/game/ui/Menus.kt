@@ -41,34 +41,26 @@ object Menus {
         }
 
     private fun checkerEdges(root: FrameLayout) {
-        root.addView(CheckerStripView(root.context, 0.6f), Ui.lp(-1, Ui.dpi(14f), Gravity.BOTTOM))
+        root.addView(CheckerStripView(root.context, 0.6f), Ui.lp(-1, Ui.dpi(5f), Gravity.BOTTOM))
     }
 
     // ------------------------------------------------------------------ title
     fun title(ctx: Context, host: MenuHost): View {
         val root = Ui.frame(ctx)
-        val shade = View(ctx).apply {
-            background = android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0xca082936.toInt(), 0x48123441, 0x00123441))
-        }
-        root.addView(shade, FrameLayout.LayoutParams(-1, -1))
-        val column = Ui.col(ctx)
         val badge = android.widget.ImageView(ctx).apply {
             setImageResource(com.vroombuddies.game.R.drawable.wordmark)
             contentDescription = "Vroom Buddies"
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
         }
-        val width = (ctx.resources.configuration.screenWidthDp * 0.42f).coerceIn(150f, 400f)
-        column.addView(badge, lp(Ui.dpi(width), Ui.dpi(width * 0.38f)))
-        val play = Ui.button(ctx, "▶   Play", Ui.ACCENT, 36f) { host.click(); host.toCarPicker() }
-        column.addView(play, lp(Ui.dpi(width * 0.74f), Ui.dpi(60f), t = 14f))
-        Ui.popIn(play, 100)
-        root.addView(column, Ui.lp(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START, l = 16f))
+        val width = (ctx.resources.configuration.screenWidthDp * 0.34f).coerceIn(155f, 320f)
+        root.addView(badge, Ui.lp(Ui.dpi(width), Ui.dpi(width * 0.39f), Gravity.TOP or Gravity.START, l = 16f, t = 8f))
+        val play = Ui.button(ctx, "Play  ▶", Ui.GREEN, 34f) { host.click(); host.toCarPicker() }
+        root.addView(play, Ui.lp(Ui.dpi(184f), Ui.dpi(65f), Gravity.BOTTOM or Gravity.END, r = 26f, b = 17f))
+        Ui.popIn(play, 120)
         // Grown-ups hold the gear to open settings, so a tap from a small finger does nothing.
         val gear = HoldButton(ctx, "⚙", Ui.PURPLE) { host.click(); host.toSettings() }
-        root.addView(gear, Ui.lp(Ui.dpi(70f), Ui.dpi(70f), Gravity.TOP or Gravity.END, t = 14f, r = 14f))
-        root.addView(Ui.text(ctx, "HOLD", 11f, 0xccffffff.toInt()), Ui.lp(Ui.dpi(70f), -2, Gravity.TOP or Gravity.END, t = 82f, r = 14f))
+        root.addView(gear, Ui.lp(Ui.dpi(54f), Ui.dpi(54f), Gravity.TOP or Gravity.END, t = 14f, r = 14f))
+        root.addView(Ui.text(ctx, "HOLD", 11f, 0xccffffff.toInt()), Ui.lp(Ui.dpi(54f), -2, Gravity.TOP or Gravity.END, t = 67f, r = 14f))
         return root
     }
 
@@ -104,7 +96,7 @@ object Menus {
     fun carPicker(ctx: Context, host: MenuHost, current: Int): View {
         val root = Ui.frame(ctx)
         checkerEdges(root)
-        header(ctx, root, "Pick your car!", Ui.ACCENT, host) { host.toTitle() }
+        header(ctx, root, "Pick your car!", Ui.BLUE, host) { host.toTitle() }
         val designs = CarDesigns.all
         var idx = current.coerceIn(0, designs.size - 1)
         val name = Ui.text(ctx, designs[idx].name.uppercase(), 34f, Color.WHITE, slant = true)
@@ -137,7 +129,7 @@ object Menus {
         plate.addView(dots, lp(w = Ui.dpi(20f) * designs.size + Ui.dpi(10f), h = Ui.dpi(14f), t = 4f))
         plate.addView(name); plate.addView(tag)
         bar.addView(plate, lp(l = 14f, r = 14f))
-        val go = Ui.button(ctx, "Next ▶", Ui.ACCENT, 28f) { host.click(); host.toPaintPicker() }
+        val go = Ui.button(ctx, "Next ▶", Ui.GREEN, 28f) { host.click(); host.toPaintPicker() }
         bar.addView(go)
         pulse(go)
         root.addView(bar, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 22f))
@@ -201,15 +193,16 @@ object Menus {
     fun paintPicker(ctx: Context, host: MenuHost, current: Int): View {
         val root = Ui.frame(ctx)
         checkerEdges(root)
-        header(ctx, root, "Pick a colour!", Ui.ACCENT, host) { host.toCarPicker() }
+        header(ctx, root, "Pick a colour!", Ui.PINK, host) { host.toCarPicker() }
         val grid = Ui.col(ctx)
         val paints = Paints.all
         val swatches = ArrayList<Swatch>()
         val perRow = (paints.size + 1) / 2
+        val swatchSize = ((ctx.resources.configuration.screenWidthDp - 200f) / perRow - 6f).coerceIn(36f, 52f)
         var row: LinearLayout? = null
         paints.forEachIndexed { i, p ->
             if (i % perRow == 0) { row = Ui.row(ctx); grid.addView(row) }
-            val sw = Swatch(ctx, p, i == current)
+            val sw = Swatch(ctx, p, i == current).apply { contentDescription = p.name }
             sw.setOnClickListener {
                 host.click(); swatches.forEach { it.picked = false; it.invalidate() }; sw.picked = true
                 sw.scaleX = 0.6f; sw.scaleY = 0.6f
@@ -217,14 +210,14 @@ object Menus {
                 host.pickPaint(i)
             }
             swatches.add(sw)
-            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(58f), Ui.dpi(58f)).apply { setMargins(Ui.dpi(3f), Ui.dpi(2f), Ui.dpi(3f), Ui.dpi(2f)) })
+            row!!.addView(sw, LinearLayout.LayoutParams(Ui.dpi(swatchSize), Ui.dpi(swatchSize)).apply { setMargins(Ui.dpi(3f), Ui.dpi(2f), Ui.dpi(3f), Ui.dpi(2f)) })
             Ui.popIn(sw, 25L * i)
         }
         grid.background = Ui.panel(); grid.setPadding(Ui.dpi(12f), Ui.dpi(8f), Ui.dpi(12f), Ui.dpi(14f))
         // swatches and the go button share one row along the bottom so the car stays visible above them
         val bottom = Ui.row(ctx)
         bottom.addView(grid)
-        val go = Ui.button(ctx, "Next ▶", Ui.ACCENT, 28f) { host.click(); host.toTrackPicker() }
+        val go = Ui.button(ctx, "Next ▶", Ui.GREEN, 28f) { host.click(); host.toTrackPicker() }
         bottom.addView(go, lp(l = 16f)); pulse(go)
         root.addView(bottom, Ui.lp(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 22f))
         return root
@@ -263,10 +256,10 @@ object Menus {
     // ------------------------------------------------------------------ track picker
     fun trackPicker(ctx: Context, host: MenuHost): View {
         val root = Ui.frame(ctx)
-        root.setBackgroundColor(0x7a1d1b3a)
+        root.setBackgroundColor(0x883761ad.toInt())
         root.addView(SpeedLinesView(ctx, 0x30ffffff, 18), FrameLayout.LayoutParams(-1, -1))
         checkerEdges(root)
-        header(ctx, root, "Where to race?", Ui.ACCENT, host) { host.toPaintPicker() }
+        header(ctx, root, "Where to race?", Ui.PURPLE, host) { host.toPaintPicker() }
         val scroll = HorizontalScrollView(ctx).apply { isHorizontalScrollBarEnabled = false; clipToPadding = false; setPadding(Ui.dpi(20f), Ui.dpi(6f), Ui.dpi(20f), Ui.dpi(6f)) }
         val strip = Ui.row(ctx)
         com.vroombuddies.game.content.Themes.all.forEachIndexed { i, th ->
@@ -283,13 +276,14 @@ object Menus {
     private fun trackTile(ctx: Context, th: Theme, index: Int, stars: Int): View {
         val card = FrameLayout(ctx)
         card.background = TileDrawable(th.skyTop or 0xff000000.toInt(), th.skyHorizon or 0xff000000.toInt(), (th.ground?.first ?: th.skyBottom) or 0xff000000.toInt())
-        card.addView(Ui.text(ctx, th.emoji, 46f, outline = false), Ui.lp(-2, -2, Gravity.TOP or Gravity.START, l = 12f, t = 44f))
-        card.addView(TrackMapView(ctx, th.shape, Ui.INK), Ui.lp(Ui.dpi(96f), Ui.dpi(96f), Gravity.TOP or Gravity.END, r = 10f, t = 14f))
+        card.addView(CoursePostcard(ctx, th), Ui.lp(-1,-1,Gravity.CENTER))
+        card.addView(Ui.text(ctx, th.emoji, 31f, outline = false), Ui.lp(-2,-2,Gravity.TOP or Gravity.START,l=15f,t=45f))
+        card.addView(TrackMapView(ctx, th.shape, Ui.INK), Ui.lp(Ui.dpi(72f), Ui.dpi(72f), Gravity.TOP or Gravity.END, r = 10f, t = 14f))
         // number badge
         val num = Ui.text(ctx, "%02d".format(index + 1), 15f).apply { background = Ui.ChunkyDrawable(Ui.ACCENT, Ui.dp(4f), lip = Ui.dp(2f), gloss = false, slant = Ui.dp(6f)); setPadding(Ui.dpi(12f), Ui.dpi(1f), Ui.dpi(12f), Ui.dpi(4f)) }
         card.addView(num, Ui.lp(-2, -2, Gravity.TOP or Gravity.START, l = 8f, t = 8f))
         // name band
-        val band = Ui.col(ctx).apply { background = Ui.panel(0xd91d1b3a.toInt(), 16f); setPadding(Ui.dpi(8f), Ui.dpi(4f), Ui.dpi(8f), Ui.dpi(10f)) }
+        val band = Ui.col(ctx).apply { background = Ui.panel(0xf02c5586.toInt(), 16f); setPadding(Ui.dpi(8f), Ui.dpi(4f), Ui.dpi(8f), Ui.dpi(10f)) }
         band.addView(Ui.text(ctx, th.name, 16f, slant = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
         band.addView(StarsView(ctx, stars), lp(w = Ui.dpi(120f), h = Ui.dpi(30f)))
         card.addView(band, Ui.lp(-1, -2, Gravity.BOTTOM, l = 10f, r = 10f, b = 16f))
@@ -415,7 +409,7 @@ object Menus {
         list.addView(Ui.text(ctx, "Shadow, texture and anisotropy changes apply on the next race.", 12f, 0xccffffff.toInt(), outline = false), lp(t = 10f))
         list.setPadding(Ui.dpi(22f), Ui.dpi(10f), Ui.dpi(22f), Ui.dpi(22f))
 
-        val sc = ScrollView(ctx).apply { isVerticalScrollBarEnabled = false; background = Ui.panel(0xf015171c.toInt()); clipToPadding = true }
+        val sc = ScrollView(ctx).apply { isVerticalScrollBarEnabled = false; background = Ui.panel(0xef214974.toInt()); clipToPadding = true }
         sc.addView(list)
         root.addView(sc, Ui.lp(-2, -1, Gravity.CENTER_HORIZONTAL, t = 82f, b = 14f))
         return root
@@ -444,7 +438,7 @@ object Menus {
         val root = Ui.frame(ctx)
         root.background = android.graphics.drawable.GradientDrawable(
             android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-            intArrayOf(0xff214f5a.toInt(), 0xff071d2a.toInt()))
+            intArrayOf(0xff278bc2.toInt(), 0xff4252a2.toInt()))
         val col = Ui.col(ctx)
         val badge = android.widget.ImageView(ctx).apply {
             setImageResource(com.vroombuddies.game.R.drawable.wordmark)

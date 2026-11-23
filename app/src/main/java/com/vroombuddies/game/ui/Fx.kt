@@ -209,24 +209,19 @@ class HoldButton(ctx: Context, private val label: String, private val color: Int
 }
 
 /** Title plate: a dark slanted bar with a coloured speed stripe on its leading edge. */
-class BannerDrawable(private val color: Int, private val lean: Float = Ui.dp(16f)) : android.graphics.drawable.Drawable() {
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val path = Path()
-    private fun para(l: Float, t: Float, r: Float, b: Float) {
-        path.reset(); path.moveTo(l + lean, t); path.lineTo(r, t); path.lineTo(r - lean, b); path.lineTo(l, b); path.close()
-    }
+class BannerDrawable(private val color: Int) : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val face = RectF()
     override fun draw(c: Canvas) {
-        val b = bounds; val sh = Ui.dp(3f)
-        val l = b.left.toFloat(); val t = b.top.toFloat(); val r = b.right.toFloat(); val bt = b.bottom.toFloat() - sh
-        p.pathEffect = CornerPathEffect(Ui.dp(4f)); p.shader = null
-        p.color = 0x66000000; para(l, t + sh, r, bt + sh); c.drawPath(path, p)
-        p.shader = LinearGradient(0f, t, 0f, bt, 0xf02a2e37.toInt(), 0xf0121419.toInt(), Shader.TileMode.CLAMP)
-        para(l, t, r, bt); c.drawPath(path, p); p.shader = null
-        // speed stripe: two parallel slashes in the accent colour on the left
-        val w = Ui.dp(7f)
-        p.color = color; para(l, t, l + w + lean, bt); c.drawPath(path, p)
-        p.color = Ui.darken(color, 0.25f); para(l + w + Ui.dp(4f), t, l + w * 1.6f + Ui.dp(4f) + lean, bt); c.drawPath(path, p)
-        // top highlight
-        p.color = 0x44ffffff; p.pathEffect = null; c.drawRect(l + lean + w * 2, t, r - Ui.dp(4f), t + Ui.dp(1f), p)
+        face.set(bounds)
+        Ui.drawChunky(c,face,Ui.dp(16f),color,lip=Ui.dp(5f),outline=Ui.dp(2.2f),p=p)
+        val size = Ui.dp(3.6f)
+        for (side in 0..1) for (row in 0..2) for (col in 0..2) {
+            if ((row+col)%2 != 0) continue
+            val x = (if (side==0) face.left+Ui.dp(12f) else face.right-Ui.dp(23f)) + col*size
+            val y = face.centerY()-size*1.9f+row*size
+            p.color = 0xcfffffff.toInt(); c.drawRect(x,y,x+size,y+size,p)
+        }
     }
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
@@ -266,4 +261,43 @@ class TileDrawable(private val top: Int, private val mid: Int, private val botto
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
     @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
+}
+
+/** Small travel-poster landscapes. The track palette and seed keep each preview recognisable. */
+class CoursePostcard(ctx: Context, private val theme: com.vroombuddies.game.content.Theme) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shape = Path()
+    override fun onDraw(c: Canvas) {
+        val w = width.toFloat(); val h = height.toFloat()
+        if (w <= 0 || h <= 0) return
+        c.save(); c.scale(w / 200f,h / 230f)
+        shape.reset(); shape.addRoundRect(3f,3f,197f,224f,10f,10f,Path.Direction.CW); c.clipPath(shape)
+        val horizon = theme.skyHorizon or Color.BLACK
+        val land = (theme.ground?.first ?: theme.skyBottom) or Color.BLACK
+        val seed = theme.shape.seed
+        p.color = if (theme.night) 0xffd9ecff.toInt() else 0xffffeaa4.toInt()
+        c.drawCircle(44f+seed%36,63f,15f,p)
+        val urban = theme.name in setOf("Neon City","Toy Town","Sunset Highway","Moon Base","Space Station")
+        p.color = Ui.lighten(land,0.30f)
+        if (urban) {
+            for (i in 0..10) {
+                val y = 70f + (i*seed%42)
+                c.drawRect(i*20f-2f,y,i*20f+15f,146f,p)
+            }
+        } else {
+            shape.reset(); shape.moveTo(-10f,150f)
+            for (i in 0..10) shape.lineTo(i*23f-12f, if (i%2==0) 114f else 62f+(i*seed%34))
+            shape.lineTo(216f,153f); shape.close(); c.drawPath(shape,p)
+        }
+        p.color=land; shape.reset(); shape.moveTo(0f,125f); shape.quadTo(39f,104f,98f,124f)
+        shape.quadTo(146f,135f,200f,108f); shape.lineTo(200f,230f); shape.lineTo(0f,230f)
+        shape.close(); c.drawPath(shape,p)
+        shape.reset(); shape.moveTo(119f,117f); shape.cubicTo(174f,122f,83f,130f,80f,143f)
+        shape.cubicTo(73f,157f,150f,164f,181f,218f); shape.lineTo(72f,218f)
+        shape.cubicTo(73f,183f,48f,162f,56f,147f); shape.cubicTo(67f,130f,153f,124f,119f,117f)
+        shape.close(); p.color=Ui.darken(horizon,0.55f); c.drawPath(shape,p)
+        p.color=0xffffeba6.toInt()
+        c.drawOval(82f,139f,88f,141f,p); c.drawOval(66f,149f,73f,152f,p)
+        c.restore()
+    }
 }

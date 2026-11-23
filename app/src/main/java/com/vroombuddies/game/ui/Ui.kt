@@ -34,27 +34,26 @@ object Ui {
         fontPlain = try { ctx.resources.getFont(R.font.exo2_bold) } catch (t: Throwable) { fontPlain }
     }
 
-    // Racing palette: carbon and steel surfaces, white type, one hot red accent and gold for wins/boost.
-    // The old names are kept so every screen picks the palette up from one place.
-    const val ACCENT = 0xffbf3e24.toInt()      // racing red: primary actions
-    const val GOLD = 0xffffb81c.toInt()        // boost, stars, first place
-    const val STEEL = 0xff245b72.toInt()       // secondary buttons
-    const val CARBON = 0xff1c293c.toInt()      // panels
+    // Enamel colours used by the festival signs, touch controls and map cards.
+    const val ACCENT = 0xffed7040.toInt()
+    const val GOLD = 0xffffca45.toInt()
+    const val STEEL = 0xff167cc3.toInt()
+    const val CARBON = 0xff204d80.toInt()
     const val YELLOW = GOLD
-    const val ORANGE = STEEL
-    const val PINK = ACCENT
+    const val ORANGE = 0xffec713c.toInt()
+    const val PINK = 0xffd64da0.toInt()
     const val BLUE = STEEL
-    const val SKY = STEEL
-    const val GREEN = ACCENT
-    const val PURPLE = STEEL
-    const val RED = ACCENT
-    const val INK = 0xff0a0b0e.toInt()
+    const val SKY = 0xff18aaca.toInt()
+    const val GREEN = 0xff188c5b.toInt()
+    const val PURPLE = 0xff7959b6.toInt()
+    const val RED = 0xffdc4765.toInt()
+    const val INK = 0xff19365c.toInt()
     const val NAVY = CARBON
-    const val OFF = 0xff5a606c.toInt()
+    const val OFF = 0xff647891.toInt()
 
     /** Race controls (dp): still big for small hands. */
-    const val STEER_SIZE = 122f
-    const val BOOST_SIZE = 146f
+    const val STEER_SIZE = 96f
+    const val BOOST_SIZE = 108f
 
     /** The italic font already leans; this adds a touch more for big titles. */
     const val SLANT = -0.06f
@@ -93,22 +92,20 @@ object Ui {
                 path.moveTo(l + slant, t); path.lineTo(rr, t); path.lineTo(rr - slant, b); path.lineTo(l, b); path.close()
             } else { p.pathEffect = null; tmp.set(l, t, rr, b); path.addRoundRect(tmp, rad, rad, Path.Direction.CW) }
         }
-        // shadow
-        p.color = 0x66000000; shape(r.left, r.top + lip, r.right, r.bottom, radius); c.drawPath(path, p)
-        // edge
+        // A thick lower rim and inset highlight make tappable pieces read like moulded enamel.
+        p.color = INK; shape(r.left, r.top + lip, r.right, r.bottom, radius); c.drawPath(path, p)
+        p.color = darken(color, 0.36f); shape(r.left + outline, r.top + lip, r.right - outline,
+            r.bottom - outline, radius); c.drawPath(path, p)
         p.color = INK; shape(r.left, r.top, r.right, bodyBottom, radius); c.drawPath(path, p)
-        // body
-        shape(r.left + outline, r.top + outline, r.right - outline, bodyBottom - outline, radius - outline / 2)
-        p.shader = LinearGradient(0f, r.top, 0f, bodyBottom, lighten(color, 0.14f), darken(color, 0.12f), Shader.TileMode.CLAMP)
-        c.drawPath(path, p); p.shader = null
+        shape(r.left + outline, r.top + outline, r.right - outline, bodyBottom - outline, radius)
+        p.color = Color.WHITE
+        p.shader = LinearGradient(0f,r.top,0f,bodyBottom,lighten(color,if(gloss) 0.27f else 0.10f),
+            darken(color,0.06f),Shader.TileMode.CLAMP)
+        c.drawPath(path,p); p.shader = null
         if (gloss) {
-            // fine highlight on the top edge and a soft sheen over the upper half
-            p.color = 0x22ffffff
-            shape(r.left + outline, r.top + outline, r.right - outline, r.top + (bodyBottom - r.top) * 0.48f, radius - outline / 2)
-            c.drawPath(path, p)
-            p.color = 0x66ffffff; p.style = Paint.Style.STROKE; p.strokeWidth = dp(1f)
-            val inset = radius.coerceAtMost((r.width()) * 0.3f)
-            c.drawLine(r.left + inset + slant * 0.9f, r.top + outline + dp(0.5f), r.right - inset, r.top + outline + dp(0.5f), p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = dp(1.6f); p.color = 0x99ffffff.toInt()
+            shape(r.left + outline*1.7f,r.top + outline*1.8f,r.right - outline*1.7f,
+                bodyBottom - outline*1.7f,radius); c.drawPath(path,p)
             p.style = Paint.Style.FILL
         }
         p.pathEffect = null
@@ -125,7 +122,7 @@ object Ui {
     }
 
     /** Dark see-through card: for name plates, stats and settings. */
-    fun panel(color: Int = 0xf0203045.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
+    fun panel(color: Int = 0xf0275691.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
 
     /** Slanted racing button: dips when pressed, springs back. */
     @SuppressLint("ClickableViewAccessibility")
@@ -133,15 +130,15 @@ object Ui {
 
     @SuppressLint("ClickableViewAccessibility")
     fun makeButton(ctx: Context, label: String, color: Int, sizeSp: Float, round: Boolean, onClick: () -> Unit): TextView =
-        text(ctx, label, sizeSp * 0.86f, outline = false).apply {
+        text(ctx, label, sizeSp * 0.90f, outline = true).apply {
             (this as OutlinedText).square = round
-            typeface = if (round) fontPlain else font
+            typeface = fontPlain
             letterSpacing = if (round) 0f else 0.045f
             minHeight = dpi(48f)
             minWidth = dpi(48f)
             isFocusable = true
             setOnClickListener { onClick() }
-            val bg = ChunkyDrawable(color, dp(if (round) 200f else 6f), lip = dp(4f), slant = if (round) 0f else dp(12f))
+            val bg = ChunkyDrawable(color, dp(if (round) 200f else 20f), lip = dp(6f), outline = dp(2.4f))
             background = android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(0x44ffffff), bg, null)
             // round buttons get slim vertical padding: a TextView whose text overflows scrolls, and that

@@ -36,11 +36,11 @@ class SteerButton(ctx: Context, private val dir: Int) : View(ctx) {
         val lip = if (held) Ui.dp(2f) else Ui.dp(5f)
         val top = (h - d) / 2 + (if (held) Ui.dp(6f) else 0f)
         rf.set((w - d) / 2, top, (w + d) / 2, top + d - (if (held) Ui.dp(6f) else 0f))
-        Ui.drawChunky(c, rf, d / 2, if (held) Ui.ACCENT else 0xd92c313b.toInt(), lip = lip, outline = Ui.dp(1.5f), p = p)
+        Ui.drawChunky(c, rf, d * 0.28f, if (held) Ui.SKY else Ui.BLUE, lip = lip, outline = Ui.dp(1.5f), p = p)
         // arrow: white with an ink outline
-        val cx = w / 2; val cy = rf.top + (rf.height() - lip) / 2; val a = d * 0.22f
+        val cx = w / 2; val cy = rf.top + (rf.height() - lip) / 2; val a = d * 0.25f
         path.reset()
-        path.moveTo(cx + dir * a * 1.05f, cy); path.lineTo(cx - dir * a * 0.65f, cy - a); path.lineTo(cx - dir * a * 0.65f, cy + a); path.close()
+        path.moveTo(cx + dir * a * 1.05f, cy); path.lineTo(cx - dir * a * 0.65f, cy - a); path.lineTo(cx - dir * a, cy - a * 0.6f); path.lineTo(cx - dir * a * 0.1f, cy); path.lineTo(cx - dir * a, cy + a * 0.6f); path.lineTo(cx - dir * a * 0.65f, cy + a); path.close()
         p.shader = null; p.pathEffect = CornerPathEffect(Ui.dp(5f))
         p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(3f); p.strokeJoin = Paint.Join.ROUND; p.color = Ui.INK; c.drawPath(path, p)
         p.style = Paint.Style.FILL; p.color = Color.WHITE; c.drawPath(path, p)
@@ -73,14 +73,14 @@ class BoostButton(ctx: Context) : View(ctx) {
         val wob = if (ready && !boosting) sin(t * 8f) * Ui.dp(3f) else 0f
         val cx = w / 2; val cy = h / 2 - Ui.dp(3f) + wob; val lip = Ui.dp(8f)
         p.style = Paint.Style.FILL; p.shader = null
-        if (ready) { p.color = if (boosting) 0x88ffffff.toInt() else 0x66ffb300; c.drawCircle(cx, cy + lip / 2, r + Ui.dp(9f) + abs(wob) * 2, p) }
+        if (ready) { p.color = if (boosting) 0x88ffffff.toInt() else 0x55aaf6ff; c.drawCircle(cx, cy + lip / 2, r + Ui.dp(9f) + abs(wob) * 2, p) }
         // ink outline + lip + body
         p.color = Ui.INK; c.drawCircle(cx, cy, r + Ui.dp(2f), p)
         p.color = 0x66000000; c.drawCircle(cx, cy + lip, r, p)
         val key = (if (ready) 1 else 0) + 2 * width + 100000 * height
         if (key != gradKey || grad == null) {
             gradKey = key
-            grad = RadialGradient(w / 2, h / 2 - r * 0.5f, r * 1.5f, if (ready) 0xffff5a5f.toInt() else 0xff4a505c.toInt(), if (ready) 0xffb3121a.toInt() else 0xff23262d.toInt(), Shader.TileMode.CLAMP)
+            grad = RadialGradient(w / 2, h / 2 - r * 0.5f, r * 1.5f, if (ready) 0xffe06ce1.toInt() else 0xff758bc4.toInt(), if (ready) 0xff743bd3.toInt() else 0xff3e5a92.toInt(), Shader.TileMode.CLAMP)
         }
         p.color = Color.BLACK; p.shader = grad
         c.drawCircle(cx, cy, r, p); p.shader = null
@@ -114,6 +114,9 @@ class HudOverlay(ctx: Context) : View(ctx) {
     private var map: TrackMaps.Map? = null
     private val mapPath = Path(); private val frame = Frame(); private val pt = FloatArray(2)
     private var edgeGlow: Shader? = null; private var edgeKey = 0
+    private var boostBurst = 0f
+    private var wasBoosting = false
+    private val spark = Path()
     private var boostT = 0f; private var t = 0f
     private var lastLap = 1; private var lapBanner = 0f; private var bannerText = ""
     private var wasFull = false; private var fullPop = 0f
@@ -138,6 +141,9 @@ class HudOverlay(ctx: Context) : View(ctx) {
     fun tick(dt: Float) {
         t += dt
         state?.let { st ->
+            if (st.boosting && !wasBoosting) boostBurst = 1f
+            wasBoosting = st.boosting
+            boostBurst = max(0f, boostBurst - dt * 1.7f)
             boostT = if (st.boosting) min(1f, boostT + dt * 5f) else max(0f, boostT - dt * 2.5f)
             if (st.lap != lastLap && st.phase == RacePhase.RACING) {
                 lastLap = st.lap; lapBanner = 1.8f
@@ -188,10 +194,24 @@ class HudOverlay(ctx: Context) : View(ctx) {
         val key = width * 31 + height
         if (edgeGlow == null || edgeKey != key) {
             edgeKey = key
-            edgeGlow = RadialGradient(w / 2, h / 2, hypot(w, h) * 0.55f, intArrayOf(0x00ff9a1a, 0x00ff9a1a, 0x88ff5a1a.toInt(), 0xddff2d6f.toInt()), floatArrayOf(0f, 0.55f, 0.85f, 1f), Shader.TileMode.CLAMP)
+            edgeGlow = RadialGradient(w / 2, h / 2, hypot(w, h) * 0.55f, intArrayOf(0x004ee9ff, 0x004ee9ff, 0x6625d6ff, 0xbb8458ec.toInt()), floatArrayOf(0f, 0.55f, 0.85f, 1f), Shader.TileMode.CLAMP)
         }
-        p.shader = edgeGlow; p.alpha = (boostT * (200 + 55 * sin(t * 25f))).toInt().coerceIn(0, 255)
+        p.shader = edgeGlow; p.alpha = (boostT * (214 + 18 * sin(t * 5f))).toInt().coerceIn(0, 255)
         c.drawRect(0f, 0f, w, h, p); p.shader = null; p.alpha = 255
+        // A pair of short comet showers fan out from the car, leaving the racing line visible.
+        if (boostBurst > 0f) {
+            val age = 1f - boostBurst
+            for (side in -1..1 step 2) for (i in 0 until 5) {
+                val cx = w * (0.5f + side * (0.12f + age * (0.15f + i * 0.047f)))
+                val cy = h * (0.68f + age * ((i - 2) * 0.095f))
+                val sz = Ui.dp(3f + (i % 3) * 2f) * (0.5f + boostBurst)
+                spark.reset(); spark.moveTo(cx,cy-sz); spark.lineTo(cx+sz*0.45f,cy)
+                spark.lineTo(cx,cy+sz); spark.lineTo(cx-sz*0.45f,cy); spark.close()
+                p.color = if (i%2==0) Ui.GOLD else Color.WHITE
+                p.alpha = (boostBurst*230).toInt(); c.drawPath(spark,p)
+            }
+            p.alpha = 255
+        }
         p.strokeCap = Paint.Cap.ROUND
         for (i in 0 until 14) {
             val a = i * 2.39996f
@@ -207,9 +227,9 @@ class HudOverlay(ctx: Context) : View(ctx) {
     private fun drawMiniMap(c: Canvas, s: HudState, w: Float) {
         val tr = track ?: return
         val m = map ?: TrackMaps.of(tr).also { map = it }
-        val size = Ui.dp(84f); val l = Ui.dp(28f); val tp = Ui.dp(128f) // under the place badge, above the steering pads
+        val size = Ui.dp(59f); val l = Ui.dp(18f); val tp = Ui.dp(95f) // under the place badge, above the steering pads
         rf.set(l - Ui.dp(8f), tp - Ui.dp(8f), l + size + Ui.dp(8f), tp + size + Ui.dp(12f))
-        Ui.drawChunky(c, rf, Ui.dp(8f), 0xc015171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p)
+        Ui.drawChunky(c, rf, Ui.dp(8f), 0xdc254e86.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p)
         TrackMaps.drawOutline(c, m, l, tp, size, p, mapPath, 0xffeeeeff.toInt(), Ui.INK, Ui.dp(4f))
         p.style = Paint.Style.FILL
         val lapLen = s.laps * tr.length
@@ -226,11 +246,11 @@ class HudOverlay(ctx: Context) : View(ctx) {
 
     /** Four chunky cells above the boost button. Each full cell is one boost. */
     private fun drawEnergyBar(c: Canvas, s: HudState, w: Float, h: Float) {
-        val cells = 4; val cw = Ui.dp(34f); val gap = Ui.dp(6f); val ch = Ui.dp(24f)
+        val cells = 4; val cw = Ui.dp(19f); val gap = Ui.dp(4f); val ch = Ui.dp(13f)
         val total = cells * cw + (cells - 1) * gap
         val cx = w - Ui.dp(18f) - Ui.dp(Ui.BOOST_SIZE / 2); val x0 = cx - total / 2; val y0 = h - Ui.dp(14f) - Ui.dp(Ui.BOOST_SIZE) - ch - Ui.dp(12f)
         rf.set(x0 - Ui.dp(10f), y0 - Ui.dp(9f), x0 + total + Ui.dp(10f), y0 + ch + Ui.dp(13f))
-        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(8f))
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xef246297.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(8f))
         val e = s.energy.coerceIn(0f, 100f) / 25f
         for (i in 0 until cells) {
             val x = x0 + i * (cw + gap)
@@ -260,19 +280,19 @@ class HudOverlay(ctx: Context) : View(ctx) {
 
         // place badge: chunky medal, big number with a small suffix
         val medal = when (s.place) { 1 -> 0xffffc61a.toInt(); 2 -> 0xffd6dde6.toInt(); 3 -> 0xffe0915a.toInt(); else -> Ui.STEEL }
-        val bx = Ui.dp(62f); val by = Ui.dp(58f); val br = Ui.dp(46f)
+        val bx = Ui.dp(48f); val by = Ui.dp(42f); val br = Ui.dp(34f)
         rf.set(bx - br, by - br, bx + br, by + br + Ui.dp(6f))
         Ui.drawChunky(c, rf, br, medal, lip = Ui.dp(4f), outline = Ui.dp(1.5f), p = p)
         val num = s.place.toString(); val suf = ordinal(s.place).removePrefix(num)
         txt.textSkewX = Ui.SLANT
-        outlined(c, num, bx - Ui.dp(9f), by + Ui.dp(17f), Ui.dp(50f), Color.WHITE)
-        outlined(c, suf, bx + Ui.dp(22f), by - Ui.dp(2f), Ui.dp(20f), Color.WHITE)
+        outlined(c, num, bx - Ui.dp(9f), by + Ui.dp(17f), Ui.dp(39f), Color.WHITE)
+        outlined(c, suf, bx + Ui.dp(16f), by - Ui.dp(2f), Ui.dp(16f), Color.WHITE)
         txt.textSkewX = 0f
 
         // lap pill
         val lw = Ui.dp(118f); val lx = w - lw - Ui.dp(16f); val ly = Ui.dp(14f)
         rf.set(lx, ly, lx + lw, ly + Ui.dp(50f))
-        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(10f))
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xef246297.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(10f))
         drawFlag(c, lx + Ui.dp(24f), ly + Ui.dp(22f), Ui.dp(22f))
         outlined(c, "${s.lap}/${s.laps}", lx + lw * 0.62f, ly + Ui.dp(33f), Ui.dp(27f), Color.WHITE)
 
@@ -280,9 +300,9 @@ class HudOverlay(ctx: Context) : View(ctx) {
         drawEnergyBar(c, s, w, h)
 
         // race strip: a chunky road with a chequered finish and every racer as a dot
-        val x0 = Ui.dp(136f); val x1 = w - Ui.dp(156f); val y = Ui.dp(38f)
+        val x0 = max(Ui.dp(112f), w * 0.30f); val x1 = min(w - Ui.dp(148f), w * 0.72f); val y = Ui.dp(38f)
         rf.set(x0 - Ui.dp(14f), y - Ui.dp(14f), x1 + Ui.dp(28f), y + Ui.dp(17f))
-        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), gloss = false, p = p, slant = Ui.dp(10f))
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xef246297.toInt(), lip = Ui.dp(3f), gloss = false, p = p, slant = Ui.dp(10f))
         // dashed centre line
         p.color = 0x55ffffff
         var dx = x0; while (dx < x1) { c.drawRoundRect(dx, y - Ui.dp(1.5f), dx + Ui.dp(10f), y + Ui.dp(1.5f), Ui.dp(1.5f), Ui.dp(1.5f), p); dx += Ui.dp(22f) }
@@ -310,11 +330,11 @@ class HudOverlay(ctx: Context) : View(ctx) {
             val label = if (n >= 1) n.toString() else "GO!"
             val col = when (n) { 3 -> 0xffff5252.toInt(); 2 -> 0xffffd740.toInt(); 1 -> 0xffffd740.toInt(); else -> 0xff69f0ae.toInt() }
             txt.textSkewX = Ui.SLANT
-            outlined(c, label, w / 2, h * 0.5f, Ui.dp(130f) * (1f + countPop * 0.5f), col)
+            outlined(c, label, w / 2, h * 0.5f, Ui.dp(78f) * (1f + countPop * 0.27f), col)
             txt.textSkewX = 0f
         } else if (goTimer > 0f) {
             txt.textSkewX = Ui.SLANT
-            outlined(c, "GO!", w / 2, h * 0.5f, Ui.dp(130f) * (1f + (0.9f - goTimer) * 0.6f), 0xff69f0ae.toInt())
+            outlined(c, "GO!", w / 2, h * 0.5f, Ui.dp(82f) * (1f + (0.9f - goTimer) * 0.23f), 0xff69f0ae.toInt())
             txt.textSkewX = 0f
         }
         if (lapBanner > 0f) {

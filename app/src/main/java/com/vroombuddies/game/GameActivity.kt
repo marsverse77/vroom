@@ -138,7 +138,7 @@ class GameActivity : Activity(), MenuHost {
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
-    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0.35f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
+    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
     override fun toCarPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.carPicker(this, this, carIndex)) }
     override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.3f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
     override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
@@ -194,7 +194,7 @@ class GameActivity : Activity(), MenuHost {
         val h = HudOverlay(this).also { it.track = game?.track }; root.addView(h, FrameLayout.LayoutParams(-1, -1)); hud = h
         val l = SteerButton(this, -1); val r = SteerButton(this, 1)
         root.addView(l, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 16f, b = 14f))
-        root.addView(r, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 150f, b = 14f))
+        root.addView(r, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = Ui.STEER_SIZE + 24f, b = 14f))
         val b = BoostButton(this)
         root.addView(b, Ui.lp(Ui.dpi(Ui.BOOST_SIZE), Ui.dpi(Ui.BOOST_SIZE), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
         root.addView(Ui.roundButton(this, "⏸", Ui.STEEL, 24f) { click(); pause() }, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
