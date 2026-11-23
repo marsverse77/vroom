@@ -63,7 +63,15 @@ written as small classes in `render/fx/` and hooked into `GameScene` with one li
 - Effects shaders are optional: if one fails to build on a phone, only that effect is switched off.
 
 ### 5. Audio
-- Owns `audio/`: richer engine sound, per-theme music loops (synthesised or original), and a jingle on the menu.
+- Owns `audio/`. Everything is synthesised at runtime (no audio files, nothing licensed):
+  - `Dsp` oscillators/filters, `Instruments` (lead, bass, mallet, bell, pluck and drum voices), `Sfx` effect recipes.
+  - `Music`: a song recipe (`Style`) per theme in `Songs`, written out by `Composer` into a 16-bar loop and played by `MusicPlayer`.
+    A new theme gets a stable fallback song; give it its own `Style` line in `Songs.byTheme`.
+  - `EngineSound`: geared engine, turbo whine on boost, free revving in the air, tyre squeal, road rumble and wind.
+  - `Mixer` mixes it all (pure Kotlin); `Sound` streams it to `AudioTrack`; `AudioSettings` holds the music/effects volumes.
+- Flow: menu song on every menu screen, the track's song starts on "GO!", a fanfare then the victory song at the finish,
+  and the music goes soft and muffled while paused.
+- `AudioTest` renders every song and effect offline; set `VROOM_AUDIO_PREVIEW=<dir>` to write WAV previews.
 
 ## Testing
 No emulator is available in the cloud, so verify sim changes with `SimTest`. For rendering, install the APK on a real phone.

@@ -397,6 +397,11 @@ object Menus {
         option("Particle effects", "Sparks, dust, smoke and confetti", levels, { s.effects }, { s.effects = it }) { it.label }
         option("Foliage wind", "Trees and grass sway", onOff, { s.foliageWind }, { s.foliageWind = it }, ::b)
 
+        section("Sound")
+        val audio = com.vroombuddies.game.audio.AudioSettings.of(ctx); val vols = com.vroombuddies.game.audio.Volume.values().toList()
+        option("Music", "Songs in menus and races", vols, { audio.music }, { audio.music = it }) { it.label }
+        option("Sound effects", "Engine, boosts and crashes", vols, { audio.effects }, { audio.effects = it }) { it.label }
+
         section("Speed")
         option("Dynamic resolution", "Drops resolution a little to stay smooth", onOff, { s.dynamicResolution }, { s.dynamicResolution = it }, ::b)
         option("Frame rate (V-Sync)", "60 is smoother, 30 saves battery", listOf(60, 30), { s.targetFps }, { s.targetFps = it }) { "$it fps" }
