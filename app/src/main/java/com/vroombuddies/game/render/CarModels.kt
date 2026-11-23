@@ -188,27 +188,36 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
     }
 
     private val m = FloatArray(16); private val m2 = FloatArray(16)
+    private val ma = FloatArray(16); private val mb = FloatArray(16)
+    private var shownMask = -1
+    private var flamesOn = true
 
-    /** Place the car. [world] = root matrix; body motion and wheel spin/steer in car space. */
+    /** Place the car. [world] = root matrix; body motion and wheel spin/steer in car space. Allocation free. */
     fun update(world: FloatArray, pitch: Float, roll: Float, bounce: Float, steer: Float, spin: Float, boost: Float, time: Float, blink: Boolean) {
         val tm = engine.transformManager
         tm.setTransform(tm.getInstance(root), world)
-        tm.setTransform(tm.getInstance(body), Mat.trs(0f, bounce, 0f, pitch, 0f, -roll))
+        tm.setTransform(tm.getInstance(body), Mat.trsInto(m, 0f, bounce, 0f, pitch, 0f, -roll))
         for (i in 0 until 4) {
             val p = parts.wheelPos[i]
             val st = if (i < 2) steer else 0f
-            tm.setTransform(tm.getInstance(wheels[i]), Mat.mul(Mat.trs(p[0], p[1] + bounce * 0.3f, p[2], 0f, -st, 0f), Mat.trs(rx = spin), m2))
+            tm.setTransform(tm.getInstance(wheels[i]), Mat.mul(Mat.trsInto(ma, p[0], p[1] + bounce * 0.3f, p[2], 0f, -st, 0f), Mat.trsInto(mb, rx = spin), m2))
         }
         val fl = if (boost > 0f) (0.8f + 0.35f * kotlin.math.sin(time * 47f) + 0.15f * kotlin.math.sin(time * 91f)) * boost else 0f
-        for ((k, e) in flames.withIndex()) {
+        val rm = engine.renderableManager
+        // flames are hidden (not squashed to zero size, which leaves a degenerate matrix) when not boosting
+        val wantFlames = fl > 0f && !blink
+        if (wantFlames != flamesOn) { flamesOn = wantFlames; for (e in flames) rm.setLayerMask(rm.getInstance(e), 0xff, if (wantFlames) 0xff else 0) }
+        if (wantFlames) for (k in flames.indices) {
             val ex = parts.exhausts[k]
-            tm.setTransform(tm.getInstance(e), Mat.trs(ex[0], ex[1], ex[2], sx = fl, sy = fl, sz = fl * (1f + 0.3f * kotlin.math.sin(time * 33f + k))))
+            tm.setTransform(tm.getInstance(flames[k]), Mat.trsInto(m, ex[0], ex[1], ex[2], sx = fl, sy = fl, sz = fl * (1f + 0.3f * kotlin.math.sin(time * 33f + k))))
         }
         if (withLight) engine.lightManager.setIntensity(engine.lightManager.getInstance(boostLight), 450f * boost)
         // blink while respawning
         val vis = if (blink) 0 else 0xff
-        val rm = engine.renderableManager
-        for (e in ents) rm.setLayerMask(rm.getInstance(e), 0xff, vis)
+        if (vis != shownMask) {
+            shownMask = vis
+            for (i in ents.indices) { val e = ents[i]; if (e !in flames) rm.setLayerMask(rm.getInstance(e), 0xff, vis) }
+        }
     }
 
     fun destroy() {

@@ -102,17 +102,21 @@ object Mat {
     fun identity() = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f)
 
     /** translate * rotY(ry) * rotX(rx) * rotZ(rz) * scale */
-    fun trs(tx: Float = 0f, ty: Float = 0f, tz: Float = 0f, rx: Float = 0f, ry: Float = 0f, rz: Float = 0f, sx: Float = 1f, sy: Float = 1f, sz: Float = 1f): FloatArray {
+    fun trs(tx: Float = 0f, ty: Float = 0f, tz: Float = 0f, rx: Float = 0f, ry: Float = 0f, rz: Float = 0f, sx: Float = 1f, sy: Float = 1f, sz: Float = 1f): FloatArray =
+        trsInto(FloatArray(16), tx, ty, tz, rx, ry, rz, sx, sy, sz)
+
+    /** [trs] written into [out]: no allocation, for per-frame use. */
+    fun trsInto(out: FloatArray, tx: Float = 0f, ty: Float = 0f, tz: Float = 0f, rx: Float = 0f, ry: Float = 0f, rz: Float = 0f, sx: Float = 1f, sy: Float = 1f, sz: Float = 1f): FloatArray {
         val cx = cos(rx); val sxr = sin(rx); val cy = cos(ry); val syr = sin(ry); val cz = cos(rz); val szr = sin(rz)
         // R = Ry * Rx * Rz
         val r00 = cy * cz + syr * sxr * szr; val r01 = -cy * szr + syr * sxr * cz; val r02 = syr * cx
         val r10 = cx * szr; val r11 = cx * cz; val r12 = -sxr
         val r20 = -syr * cz + cy * sxr * szr; val r21 = syr * szr + cy * sxr * cz; val r22 = cy * cx
-        return floatArrayOf(
-            r00 * sx, r10 * sx, r20 * sx, 0f,
-            r01 * sy, r11 * sy, r21 * sy, 0f,
-            r02 * sz, r12 * sz, r22 * sz, 0f,
-            tx, ty, tz, 1f)
+        out[0] = r00 * sx; out[1] = r10 * sx; out[2] = r20 * sx; out[3] = 0f
+        out[4] = r01 * sy; out[5] = r11 * sy; out[6] = r21 * sy; out[7] = 0f
+        out[8] = r02 * sz; out[9] = r12 * sz; out[10] = r22 * sz; out[11] = 0f
+        out[12] = tx; out[13] = ty; out[14] = tz; out[15] = 1f
+        return out
     }
 
     fun mul(a: FloatArray, b: FloatArray, out: FloatArray = FloatArray(16)): FloatArray {

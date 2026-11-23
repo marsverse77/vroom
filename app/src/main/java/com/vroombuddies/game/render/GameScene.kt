@@ -55,6 +55,8 @@ class GameScene(
     val hud = HudState()
     private val rnd = Random(9)
     private var time = 0f
+    /** Warm-up frames behind the loading screen: show boost flames and a few particles so their shaders get built. */
+    var warming = false
 
     init {
         val aiPaints = Paints.all.filter { it.color != paint.color && !it.rainbow }.shuffled(Random(theme.shape.seed))
@@ -209,7 +211,9 @@ class GameScene(
         shake = max(0f, shake - realDt * 2.5f)
         val sk = shake * shake * 0.5f
         val sx = (rnd.nextFloat() - 0.5f) * sk; val sy = (rnd.nextFloat() - 0.5f) * sk
-        camera.setProjection(fov.toDouble(), aspect.toDouble(), 0.3, 6000.0, Camera.Fov.VERTICAL)
+        // near/far kept as tight as the scene allows (sky dome is at 2.6 km): far more depth precision,
+        // so road markings, boost pads and the start line never flicker against the road far away
+        camera.setProjection(fov.toDouble(), aspect.toDouble(), NEAR, FAR, Camera.Fov.VERTICAL)
         // up vector tilted by the cinematic roll (dutch angle)
         var vfx = look[0] - eye[0]; var vfz = look[2] - eye[2]
         val vl = sqrt(vfx * vfx + vfz * vfz).coerceAtLeast(1e-4f); vfx /= vl; vfz /= vl
@@ -221,11 +225,15 @@ class GameScene(
         settings.setDof(view, camMode == CamMode.CINEMA || camMode == CamMode.ORBIT, camDist, camera)
         hud.letterbox = lerp(hud.letterbox, if (camMode == CamMode.CINEMA) 1f else 0f, 1f - exp(-realDt * 6f))
         updatePost(realDt, v, px, py, pz, dx, dz)
-        view.vignetteOptions = View.VignetteOptions().apply {
-            enabled = true; midPoint = 0.45f - 0.15f * boost; roundness = 0.6f; feather = 0.6f
-            color = if (boost > 0f) floatArrayOf(0.3f, 0.05f, 0f, 1f) else floatArrayOf(0f, 0f, 0f, 1f)
+        if (boost != vignetteBoost) {
+            vignetteBoost = boost
+            vignette.midPoint = 0.45f - 0.15f * boost
+            vignette.color = if (boost > 0f) VIGNETTE_BOOST else VIGNETTE_PLAIN
+            view.vignetteOptions = vignette
         }
     }
+    private val vignette = View.VignetteOptions().apply { enabled = true; roundness = 0.6f; feather = 0.6f }
+    private var vignetteBoost = -1f
 
     // ------------------------------------------------------------------ effects
     private fun worldOf(s: Float, x: Float, y: Float, out: FloatArray) { track.frame(s, fr); out[0] = fr.x + fr.rx * x; out[1] = y; out[2] = fr.z + fr.rz * x }
@@ -233,7 +241,8 @@ class GameScene(
 
     private fun handleEvents() {
         val pv = race.playerVehicle
-        for (e in race.events) {
+        for (ei in race.events.indices) {
+            val e = race.events[ei]
             val mine = e.car === pv
             worldOf(e.s, e.x, e.y, ev)
             when (e.type) {
@@ -309,8 +318,8 @@ class GameScene(
                 0.35f, 0.5f, 0.1f, 4f, 1.6f, 0.4f, 1f, 0f, 2f, 0.03f)
         }
         // tyre smoke when sliding
-        for (r in race.racers) {
-            val c = r.vehicle
+        for (ri in race.racers.indices) {
+            val c = race.racers[ri].vehicle
             if (c.onGround && abs(c.vl) > 4.5f && rnd.nextFloat() < 0.6f) {
                 carPose(c, tmpP, tmpF)
                 alpha.spawn(tmpP[0] - tmpF[0] * 1.5f, tmpP[1] + 0.3f, tmpP[2] - tmpF[2] * 1.5f, 0f, 1f, 0f, 1.2f, 1f, 3.5f, 0.85f, 0.85f, 0.85f, 0.45f, -0.4f, 1f)
@@ -342,8 +351,7 @@ class GameScene(
             fireworkTimer -= dt
             if (rnd.nextFloat() < dt * 2.2f) {
                 carPose(v, tmpP, tmpF)
-                val cols = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
-                val c = cols[rnd.nextInt(cols.size)]
+                val c = FIREWORK_COLOURS[rnd.nextInt(FIREWORK_COLOURS.size)]
                 add.burst(70, tmpP[0] + (rnd.nextFloat() - 0.5f) * 30f, tmpP[1] + 18f + rnd.nextFloat() * 10f, tmpP[2] + (rnd.nextFloat() - 0.5f) * 30f,
                     14f, 0f, 1.4f, 0.5f, 0.1f, c[0], c[1], c[2], 1f, 4f, 0.03f)
                 sound.play("firework")
@@ -370,7 +378,8 @@ class GameScene(
         handleEvents()
 
         // cars
-        for ((i, r) in race.racers.withIndex()) {
+        for (i in race.racers.indices) {
+            val r = race.racers[i]
             val v = r.vehicle
             carPose(v, tmpP, tmpF)
             var fx = tmpF[0]; var fy = tmpF[1]; var fz = tmpF[2]
@@ -380,7 +389,7 @@ class GameScene(
             Mat.basis(mtx, rx, ry, rz, ux, uy, uz, fx, fy, fz, tmpP[0], tmpP[1], tmpP[2])
             val blink = v.resetFlash > 0f && ((time * 12).toInt() % 2 == 0)
             val kick = if (r.isPlayer) boostKick else 0f
-            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting) 1f + kick * 0.8f else 0f, time, blink)
+            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting || warming) 1f + kick * 0.8f else 0f, time, blink)
             // light trails from both rear corners (model +X maps to -right)
             val heat = if (v.boosting && !blink) 1f else 0f
             for (k in 0..1) {
@@ -392,7 +401,12 @@ class GameScene(
         knock.update()
         ambientFx(realDt)
         updateCamera(realDt)
-        val cr = camera.getLeftVector(FloatArray(3)); val cu = camera.getUpVector(FloatArray(3))
+        val cr = camera.getLeftVector(camLeft); val cu = camera.getUpVector(camUp)
+        if (warming) {
+            // one of each particle kind right in front of the camera (hidden by the loading screen)
+            add.spawn(look[0], look[1], look[2], 0f, 0f, 0f, 0.1f, 0.3f, 0.3f, 1f, 1f, 1f, 1f, force = true)
+            alpha.spawn(look[0], look[1], look[2], 0f, 0f, 0f, 0.1f, 0.3f, 0.3f, 1f, 1f, 1f, 1f, force = true)
+        }
         trails.update(eye[0], eye[1], eye[2])
         add.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         alpha.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
@@ -405,7 +419,15 @@ class GameScene(
         hud.speedKmh = pv.speed * 3.6f; hud.boosting = pv.boosting
         hud.countdown = race.countdown; hud.phase = race.phase
         hud.flash = max(0f, hud.flash - realDt * 2f); hud.whoops = max(0f, hud.whoops - realDt)
-        for ((i, r) in race.racers.withIndex()) hud.progress[i] = (r.vehicle.progress / (race.laps * track.length)).coerceIn(0f, 1f)
+        for (i in race.racers.indices) hud.progress[i] = (race.racers[i].vehicle.progress / (race.laps * track.length)).coerceIn(0f, 1f)
+    }
+    private val camLeft = FloatArray(3); private val camUp = FloatArray(3)
+
+    companion object {
+        const val NEAR = 0.5; const val FAR = 3000.0
+        private val VIGNETTE_PLAIN = floatArrayOf(0f, 0f, 0f, 1f)
+        private val VIGNETTE_BOOST = floatArrayOf(0.3f, 0.05f, 0f, 1f)
+        private val FIREWORK_COLOURS = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
     }
 
     fun restart() {
@@ -420,5 +442,9 @@ class GameScene(
         tropics?.destroy()
         weather?.destroy(scene)
         grading?.let { view.colorGrading = null; engine.destroyColorGrading(it) }
+        // leave the view as the menus expect it: no race fog, boost vignette or jump-cam blur carried over
+        view.fogOptions = View.FogOptions()
+        view.vignetteOptions = View.VignetteOptions()
+        settings.setDof(view, false, 12f, camera)
     }
 }

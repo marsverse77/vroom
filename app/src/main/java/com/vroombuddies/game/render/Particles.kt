@@ -86,20 +86,23 @@ class Particles(private val engine: Engine, scene: Scene, material: Material, pr
 
     fun clear() { for (i in 0 until max) life[i] = 0f }
 
-    /** Simulate and rebuild the quads. cam* = camera position, right and up vectors. */
+    private val posArr = FloatArray(max * 12); private val colArr = FloatArray(max * 16)
+    private var drawn = -1
+
+    /**
+     * Simulate and rebuild the quads. cam* = camera position, right and up vectors.
+     * Only live particles are packed and uploaded, and only they are drawn; with none alive nothing is sent.
+     */
     fun update(dt: Float, camX: Float, camY: Float, camZ: Float, rX: Float, rY: Float, rZ: Float, uX: Float, uY: Float, uZ: Float) {
-        val pos = posBufs[ring]; val col = colBufs[ring]; ring = (ring + 1) % 3
-        pos.clear(); col.clear()
+        var n = 0
         for (i in 0 until max) {
-            if (life[i] <= 0f) {
-                repeat(4) { pos.put(0f).put(-1e4f).put(0f); col.put(0f).put(0f).put(0f).put(0f) }
-                continue
-            }
+            if (life[i] <= 0f) continue
             life[i] -= dt
+            if (life[i] <= 0f) continue
             val k = exp(-drag[i] * dt)
             vx[i] *= k; vy[i] = vy[i] * k - grav[i] * dt; vz[i] *= k
             px[i] += vx[i] * dt; py[i] += vy[i] * dt; pz[i] += vz[i] * dt
-            val t = 1f - max(0f, life[i]) / maxLife[i]
+            val t = 1f - life[i] / maxLife[i]
             val s = size0[i] + (size1[i] - size0[i]) * t
             val fade = (1f - t) * min(1f, t * 8f + 0.2f)
             val a = ca[i] * fade
@@ -119,15 +122,27 @@ class Particles(private val engine: Engine, scene: Scene, material: Material, pr
                 bx = uX * s * 0.5f; by = uY * s * 0.5f; bz = uZ * s * 0.5f
             }
             val x = px[i]; val y = py[i]; val z = pz[i]
-            pos.put(x - ax - bx).put(y - ay - by).put(z - az - bz)
-            pos.put(x + ax - bx).put(y + ay - by).put(z + az - bz)
-            pos.put(x + ax + bx).put(y + ay + by).put(z + az + bz)
-            pos.put(x - ax + bx).put(y - ay + by).put(z - az + bz)
-            repeat(4) { col.put(cr[i]).put(cg[i]).put(cb[i]).put(a) }
+            var o = n * 12
+            posArr[o++] = x - ax - bx; posArr[o++] = y - ay - by; posArr[o++] = z - az - bz
+            posArr[o++] = x + ax - bx; posArr[o++] = y + ay - by; posArr[o++] = z + az - bz
+            posArr[o++] = x + ax + bx; posArr[o++] = y + ay + by; posArr[o++] = z + az + bz
+            posArr[o++] = x - ax + bx; posArr[o++] = y - ay + by; posArr[o] = z - az + bz
+            var c = n * 16
+            repeat(4) { colArr[c++] = cr[i]; colArr[c++] = cg[i]; colArr[c++] = cb[i]; colArr[c++] = a }
+            n++
         }
-        pos.flip(); col.flip()
+        if (n == 0 && drawn == 0) return
+        val rm = engine.renderableManager; val inst = rm.getInstance(entity)
+        if (n == 0) { rm.setLayerMask(inst, 0xff, 0); drawn = 0; return }
+        if (drawn <= 0) rm.setLayerMask(inst, 0xff, 0xff)
+        // three buffers in rotation: Filament reads each one asynchronously a frame or two later
+        val pos = posBufs[ring]; val col = colBufs[ring]; ring = (ring + 1) % 3
+        pos.clear(); col.clear()
+        pos.put(posArr, 0, n * 12).flip(); col.put(colArr, 0, n * 16).flip()
         vb.setBufferAt(engine, 0, pos)
         vb.setBufferAt(engine, 1, col)
+        if (n != drawn) rm.setGeometryAt(inst, 0, RenderableManager.PrimitiveType.TRIANGLES, vb, ib, 0, n * 6)
+        drawn = n
     }
 
     fun destroy(scene: Scene) {

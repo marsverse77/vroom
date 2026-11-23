@@ -191,5 +191,17 @@ class MaterialLib(private val ctx: Context) {
         water = opt("water"); postFx = opt("postFx")
     }
 
+    /**
+     * Queue every shader variant the game can use for compiling now. Filament compiles them on its own
+     * threads where the driver supports it; otherwise this is a no-op and the warm-up frames in the
+     * activity (drawn behind the loading screen) do the job.
+     */
+    fun prewarm() {
+        val variants = Material.UserVariantFilterBit.ALL and variantFilter.inv()
+        for (m in listOfNotNull(lit, paint, textured, glow, glowTex, particleAdd, particleAlpha, water, postFx)) {
+            try { m.compile(Material.CompilerPriorityQueue.HIGH, variants, null, null) } catch (t: Throwable) { android.util.Log.w("Vroom", "prewarm", t) }
+        }
+    }
+
     companion object { const val VERSION = "filament-1.81.0-v1" }
 }

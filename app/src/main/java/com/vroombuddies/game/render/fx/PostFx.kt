@@ -14,7 +14,9 @@ class PostFxInputs {
     var focusU = 0.5f; var focusV = 0.55f
     val rayColor = floatArrayOf(1f, 0.9f, 0.7f)
     val boostColor = floatArrayOf(1f, 0.45f, 0.1f)
-    val active get() = blur > 0.01f || (rays > 0.01f && sunVisible > 0.01f) || boost > 0.01f
+    /** Run the pass even with nothing to show (warm-up frames build its shader and buffers ahead of time). */
+    var force = false
+    val active get() = force || blur > 0.01f || (rays > 0.01f && sunVisible > 0.01f) || boost > 0.01f
 }
 
 /**

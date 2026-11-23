@@ -58,6 +58,16 @@ class GameActivity : Activity(), MenuHost {
     private var boostBtn: BoostButton? = null
     private var keyLeft = false; private var keyRight = false; private var keyBoost = false
     private var lastNanos = 0L
+    private var vsyncs = 0
+    private var frames = 0
+
+    private fun followRefreshRate() {
+        @Suppress("DEPRECATION")
+        val hz = surface.display?.refreshRate ?: return
+        if (kotlin.math.abs(hz - settings.displayHz) > 1f) { settings.displayHz = hz; settings.applyFrameRate(renderer) }
+    }
+    private var warmFrames = 0
+    private val WARM_FRAMES = 4
     private var aspect = 1.8f
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +83,7 @@ class GameActivity : Activity(), MenuHost {
         hideSystemUi()
 
         settings = GraphicsSettings(this)
+        pickDisplayMode()
         choreographer = Choreographer.getInstance()
         displayHelper = DisplayHelper(this)
         uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
@@ -97,6 +108,9 @@ class GameActivity : Activity(), MenuHost {
             runOnUiThread {
                 if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
                 mats.create(engine, pkgs)
+                // start compiling every shader variant now (in the background where the GPU driver allows),
+                // so the first spark, boost or jump never pauses the game to build a shader
+                mats.prewarm()
                 postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
                 toTitle()
@@ -133,7 +147,26 @@ class GameActivity : Activity(), MenuHost {
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
-    override fun applySettings() { settings.save(); settings.apply(view, renderer) }
+    override fun applySettings() { settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
+
+    /**
+     * Ask for a screen mode that matches the frame-rate setting. A 120 Hz tablet asked to run a 60 fps game
+     * otherwise keeps refreshing at 120 Hz and every frame lands unevenly (judder). Switching the panel to
+     * 60 Hz, or drawing on every 2nd refresh when it can't switch, keeps frames perfectly even.
+     */
+    private fun pickDisplayMode() {
+        try {
+            @Suppress("DEPRECATION")
+            val d = (if (android.os.Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
+            val cur = d.mode
+            val modes = d.supportedModes.filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+            val want = settings.targetFps.toFloat()
+            // the slowest mode that still reaches the target; a screen that can't reach it runs flat out
+            val best = modes.filter { it.refreshRate >= want - 1f }.minByOrNull { it.refreshRate } ?: modes.maxByOrNull { it.refreshRate } ?: cur
+            if (window.attributes.preferredDisplayModeId != best.modeId) window.attributes = window.attributes.also { it.preferredDisplayModeId = best.modeId }
+            settings.displayHz = best.refreshRate
+        } catch (t: Throwable) { Log.w("Vroom", "display mode", t) }
+    }
     override fun click() = sound.play("click")
     override fun stars(themeIndex: Int) = getSharedPreferences("progress", MODE_PRIVATE).getInt("stars$themeIndex", 0)
 
@@ -146,9 +179,14 @@ class GameActivity : Activity(), MenuHost {
             game?.destroy()
             settings.apply(view, renderer)
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
+            // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
+            // instead of letting the collector wake up in the middle of the race
+            Runtime.getRuntime().gc()
             sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
-            showHud()
+            // draw a few hidden frames with every effect on (still behind the loading screen) so shaders,
+            // shadow maps and post-processing buffers are all ready before the countdown appears
+            warmFrames = WARM_FRAMES
         }, 120)
     }
 
@@ -213,11 +251,26 @@ class GameActivity : Activity(), MenuHost {
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             choreographer.postFrameCallback(this)
+            // the screen may switch modes a moment after we ask (or refuse): follow its real refresh rate
+            if ((frames++ and 63) == 0) followRefreshRate()
+            // frame pacing: on a fast screen that couldn't switch to the game's frame rate, draw on every Nth refresh
+            val interval = settings.frameInterval
+            if (interval > 1 && (vsyncs++ % interval) != 0) return
             val dt = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceIn(0.001f, 0.05f)
             lastNanos = frameTimeNanos
             if (!ready) return
             val g = game
-            if (g != null) {
+            if (g != null && warmFrames > 0) {
+                g.warming = true
+                g.update(1f / 60f, 0f, false)
+                g.post.force = true
+                if (settings.depthOfField) settings.setDof(view, true, 8f, camera)
+                if (--warmFrames == 0) {
+                    g.warming = false; g.post.force = false
+                    settings.setDof(view, false, 8f, camera)
+                    showHud()
+                }
+            } else if (g != null) {
                 if (!paused) {
                     val steer = ((if (right?.held == true || keyRight) 1f else 0f) - (if (left?.held == true || keyLeft) 1f else 0f))
                     val boost = (boostBtn?.tapped == true) || keyBoost
@@ -273,6 +326,7 @@ class GameActivity : Activity(), MenuHost {
         override fun onResized(width: Int, height: Int) {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
+            settings.screenW = width; settings.screenH = height; settings.apply(view, renderer)
             surfaceW = width; surfaceH = height; postFx?.resize(width, height)
             game?.setAspect(aspect); showroom?.setAspect(aspect)
         }
