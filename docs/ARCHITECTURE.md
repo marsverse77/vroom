@@ -34,7 +34,7 @@ Each stream owns its own files and only touches a shared file to add one line.
 |---|---|---|
 | A Hot & dry | Desert Canyon, Sunset Highway, Volcano Run, Dino Valley | cactus, tumbleweed, mesa, billboard, lavaRock, volcano, fern, bigEgg |
 | B Space | Space Station, Moon Base, Galaxy Grand Prix, Crystal Canyon | asteroid, satellite, planet, dome, antenna, crystal, glowMushroom |
-| C Water & tropics | Sunny Beach, Jungle Jam, Pirate Cove, Bubble Reef | palm, umbrella, beachBall, sandcastle, chest, barrelProp, coral, kelp, fish |
+| C Water & tropics | Sunny Beach, Jungle Jam, Pirate Cove, Bubble Reef | palm, umbrella, beachBall, sandcastle, chest, barrelProp, coral, kelp, fish (also built: lifeguardTower, surfboards, beachHut, crab, starfish, sailboat, islet, jungleTree, bigLeaf, giantFlower, tikiTotem, jungleRuin, parrot, cannon, anchor, jollyFlag, lantern, pirateShip, anemone, clam, jellyfish, sunkenShip) |
 | D Cold & cozy | Snowy Peaks, Frozen Lake, Autumn Woods | snowPine, snowman, iceberg, penguin, igloo, autumnTree, pumpkin, hayBale |
 | E Fun town | Neon City, Sweet Treats, Toy Town, Rainbow Sky | building, lamp, neonSign, lollipop, candyCane, gumdrop, toyBlocks, toyBall, pencil, toyHouse, cloudPuff, rainbow |
 
