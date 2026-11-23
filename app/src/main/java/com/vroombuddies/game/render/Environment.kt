@@ -151,7 +151,10 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
                 sb.put(Half.toHalf(c[0])); sb.put(Half.toHalf(c[1])); sb.put(Half.toHalf(c[2])); sb.put(Half.toHalf(1f))
             }
         }
-        val equirect = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
+        // The reflection prefilter generates and samples the full panorama mip chain.
+        val equirect = Texture.Builder().width(w).height(h).levels(0xff)
+            .sampler(Texture.Sampler.SAMPLER_2D)
+            .usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
             .format(Texture.InternalFormat.RGBA16F).build(engine)
         equirect.setImage(engine, 0, Texture.PixelBufferDescriptor(buf, Texture.Format.RGBA, Texture.Type.HALF))
         val ctx = IBLPrefilterContext(engine)
