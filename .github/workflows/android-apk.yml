@@ -30,6 +30,7 @@ jobs:
           api-level: 35
           arch: x86_64
           target: default
+          emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -no-snapshot -camera-back none
           emulator-boot-timeout: 300
           script: python3 tools/test_launch.py
       - uses: actions/upload-artifact@v4
