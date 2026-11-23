@@ -302,6 +302,7 @@ class GameActivity : Activity(), MenuHost {
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 if (!loggedFrame) Log.i("Vroom", "first endFrame")
                 renderer.endFrame()
+                if (!loggedFrame) Log.i("Vroom", "Showroom frame submitted")
                 loggedFrame = true
             }
         }

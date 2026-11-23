@@ -4,17 +4,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 jobs:
-  inspect:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: launch-check
-          github-token: ${{ github.token }}
-          run-id: 45185906606
-      - run: grep -E 'F DEBUG|I Vroom|Fatal signal' first.log | tail -120
   build:
     runs-on: ubuntu-latest
     steps:
