@@ -2,7 +2,6 @@ package com.vroombuddies.game.render
 
 import android.util.Half
 import com.google.android.filament.*
-import com.google.android.filament.utils.IBLPrefilterContext
 import com.vroombuddies.game.content.Theme
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -11,7 +10,7 @@ import kotlin.math.*
 /**
  * Sky, sun and sky light for a theme:
  *  - a gradient sky dome mesh (unlit, follows the camera),
- *  - image based lighting: the same sky rendered into an HDR panorama, prefiltered by Filament
+ *  - image based lighting: the same sky sampled into a roughness-filtered HDR cube
  *    into glossy reflections, plus 9-term spherical harmonics fitted on the CPU for soft ambient light
  *    (this is the "global illumination" approximation: light from every direction of the sky),
  *  - a shadow-casting sun with soft shadows,
@@ -60,7 +59,7 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
     fun buildSun(shadowMapSize: Int, cascades: Int) {
         if (engine.lightManager.hasComponent(sunEntity)) { scene.remove(sunEntity); engine.lightManager.destroy(sunEntity) }
         val so = LightManager.ShadowOptions().apply {
-            mapSize = shadowMapSize
+            mapSize = shadowMapSize.coerceAtLeast(16)
             shadowCascades = cascades
             shadowFar = 160f
             // stable cascades: texels snap to the world so shadow edges don't crawl or shimmer while
@@ -138,32 +137,40 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
 
     @android.annotation.SuppressLint("HalfFloat") // raw half-float bits are what the RGBA16F texture wants
     private fun buildIbl() {
-        // HDR panorama of the sky (row 0 = straight up)
-        val w = 256; val h = 128
-        val buf = ByteBuffer.allocateDirect(w * h * 4 * 2).order(ByteOrder.nativeOrder())
-        val sb = buf.asShortBuffer()
-        for (j in 0 until h) {
-            val th = (j + 0.5f) / h * PI.toFloat()
-            for (i in 0 until w) {
-                val ph = (i + 0.5f) / w * PI.toFloat() * 2
-                val x = sin(th) * cos(ph); val y = cos(th); val z = sin(th) * sin(ph)
-                val c = skyColor(x, y, z, true)
-                sb.put(Half.toHalf(c[0])); sb.put(Half.toHalf(c[1])); sb.put(Half.toHalf(c[2])); sb.put(Half.toHalf(1f))
+        // Upload a complete reflection cube directly. Mip zero resolves crisp sky detail,
+        // while the wider angular samples in the remaining levels soften rough paint.
+        val edge = 64
+        val levels = Integer.numberOfTrailingZeros(edge) + 1
+        val cube = Texture.Builder().width(edge).height(edge).levels(levels)
+            .sampler(Texture.Sampler.SAMPLER_CUBEMAP)
+            .format(Texture.InternalFormat.RGBA16F)
+            .usage(Texture.Usage.DEFAULT)
+            .build(engine)
+        for (level in 0 until levels) {
+            val size = edge shr level
+            val data = ByteBuffer.allocateDirect(6 * size * size * 8).order(ByteOrder.nativeOrder())
+            val pixels = data.asShortBuffer()
+            val roughness = level.toFloat() / (levels - 1)
+            for (face in 0 until 6) for (row in 0 until size) for (column in 0 until size) {
+                val u = (column + 0.5f) * 2f / size - 1f
+                val v = (row + 0.5f) * 2f / size - 1f
+                val x = when (face) { 0 -> 1f; 1 -> -1f; 5 -> -u; else -> u }
+                val y = when (face) { 2 -> 1f; 3 -> -1f; else -> -v }
+                val z = when (face) { 0 -> -u; 1 -> u; 2 -> v; 3 -> -v; 4 -> 1f; else -> -1f }
+                val length = sqrt(x*x + y*y + z*z)
+                val directionY = y / length
+                val sharp = skyColor(x/length, directionY, z/length, true)
+                val broad = skyColor(0f, directionY * (1f - roughness), 0f, false)
+                val blend = roughness * (2f - roughness)
+                for (channel in 0 until 3) {
+                    pixels.put(Half.toHalf(sharp[channel] + blend * (broad[channel] - sharp[channel])))
+                }
+                pixels.put(Half.toHalf(1f))
             }
+            cube.setImage(engine, level, 0, 0, 0, size, size, 6,
+                Texture.PixelBufferDescriptor(data, Texture.Format.RGBA, Texture.Type.HALF))
         }
-        // The reflection prefilter generates and samples the full panorama mip chain.
-        val equirect = Texture.Builder().width(w).height(h).levels(0xff)
-            .sampler(Texture.Sampler.SAMPLER_2D)
-            .usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
-            .format(Texture.InternalFormat.RGBA16F).build(engine)
-        equirect.setImage(engine, 0, Texture.PixelBufferDescriptor(buf, Texture.Format.RGBA, Texture.Type.HALF))
-        val ctx = IBLPrefilterContext(engine)
-        val toCube = IBLPrefilterContext.EquirectangularToCubemap(ctx)
-        val cube = toCube.run(equirect)
-        val spec = IBLPrefilterContext.SpecularFilter(ctx)
-        reflections = spec.run(cube)
-        spec.destroy(); toCube.destroy(); ctx.destroy()
-        engine.destroyTexture(equirect); engine.destroyTexture(cube)
+        reflections = cube
 
         ibl = IndirectLight.Builder()
             .reflections(reflections!!)

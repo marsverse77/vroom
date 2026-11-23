@@ -24,7 +24,7 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
     var offsetY = 0f
 
     init {
-        env.build(settings.shadowMapSize.coerceAtMost(1024), 1)
+        env.build(0, 1)
         env.applyFog(view, false)
         val m = MeshData()
         Prims.cylinder(m, 5.2f, 5.4f, 0.5f, Rgba.hex(0xffffff), Mat.trs(0f, -0.25f, 0f), 48)
