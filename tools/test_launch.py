@@ -14,12 +14,12 @@ def running():
     return subprocess.run(["adb", "shell", "pidof", PACKAGE], stdout=subprocess.DEVNULL).returncode == 0
 
 adb("install", "-r", "VroomBuddies-fixed.apk")
-for launch in ("first", "cached"):
+for launch in ("empty,ibl,warm,fx,sun,post", "ibl,warm,fx,sun,post", "ibl", "warm", "fx", "sun", "post", "empty", "unlit"):
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
-    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity")
+    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity", "--es", "probe", launch)
     try:
-        deadline = time.monotonic() + 100
+        deadline = time.monotonic() + 35
         while time.monotonic() < deadline:
             if not running():
                 raise RuntimeError(f"{launch} launch exited")
@@ -33,6 +33,8 @@ for launch in ("first", "cached"):
             raise RuntimeError(f"{launch} launch exited after first frame")
         (OUT / f"{launch}.png").write_bytes(adb("exec-out", "screencap", "-p"))
         print(f"Verified {launch} launch and showroom frame")
+    except (RuntimeError, subprocess.SubprocessError) as e:
+        print("PROBE FAILED", launch, e, flush=True)
     finally:
         logs = adb("logcat", "-d", "-t", "5000")
         (OUT / f"{launch}.log").write_bytes(logs)

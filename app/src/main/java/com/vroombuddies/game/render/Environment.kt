@@ -53,11 +53,11 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
         val n = sqrt(sunDir[0] * sunDir[0] + sunDir[1] * sunDir[1] + sunDir[2] * sunDir[2])
         for (i in 0..2) sunDir[i] /= n
         android.util.Log.i("Vroom", "Startup: buildSun")
-        buildSun(shadowMapSize, cascades)
+        if (!probe("sun")) buildSun(shadowMapSize, cascades)
         android.util.Log.i("Vroom", "Startup: buildSkyDome")
         buildSkyDome()
         android.util.Log.i("Vroom", "Startup: buildIbl")
-        buildIbl()
+        if (!probe("ibl")) buildIbl()
     }
 
     fun buildSun(shadowMapSize: Int, cascades: Int) {

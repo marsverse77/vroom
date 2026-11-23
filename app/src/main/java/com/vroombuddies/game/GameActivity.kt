@@ -73,6 +73,7 @@ class GameActivity : Activity(), MenuHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        System.setProperty("vroom.probe", intent.getStringExtra("probe") ?: "")
         Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
@@ -116,9 +117,9 @@ class GameActivity : Activity(), MenuHost {
                 // start compiling every shader variant now (in the background where the GPU driver allows),
                 // so the first spark, boost or jump never pauses the game to build a shader
                 android.util.Log.i("Vroom", "Startup: mats.prewarm")
-                mats.prewarm()
+                if (!probe("warm")) mats.prewarm()
                 android.util.Log.i("Vroom", "Startup: postFx")
-                postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
+                if (!probe("fx")) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
                 ready = true
                 android.util.Log.i("Vroom", "Startup: toTitle")
                 toTitle()
@@ -297,6 +298,13 @@ class GameActivity : Activity(), MenuHost {
             }
             val sc = swapChain ?: return
             if (!loggedFrame) Log.i("Vroom", "first beginFrame")
+            if (probe("empty") && !loggedFrame) view.scene = engine.createScene()
+            if (probe("post")) view.isPostProcessingEnabled = false
+            if (probe("unlit")) {
+                view.isShadowingEnabled = false
+                view.isPostProcessingEnabled = false
+                scene.indirectLight = null
+            }
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
                 if (!loggedFrame) Log.i("Vroom", "first render")
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
