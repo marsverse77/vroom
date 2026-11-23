@@ -23,6 +23,8 @@ jobs:
           name: VroomBuddies-fixed
           path: VroomBuddies-fixed.apk
       - run: bash gradlew :app:testDebugUnitTest
+      - name: Prepare screenshot checks
+        run: python3 -c "from PIL import Image" || python3 -m pip install Pillow
       - name: Enable emulator acceleration
         run: sudo chmod a+rw /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
@@ -34,9 +36,7 @@ jobs:
           emulator-boot-timeout: 300
           script: python3 tools/test_launch.py
       - name: Assemble visual review from Android captures
-        run: |
-          python3 -c "from PIL import Image" || python3 -m pip install Pillow
-          python3 tools/showroom_review.py
+        run: python3 tools/showroom_review.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

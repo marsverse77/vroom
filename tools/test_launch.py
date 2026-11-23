@@ -2,6 +2,8 @@
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from io import BytesIO
+from PIL import Image
 import subprocess
 import time
 
@@ -17,7 +19,7 @@ def running():
 
 adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
 adb("install", "-r", "VroomBuddies-fixed.apk")
-def tap_label(text, exact=False):
+def wait_label(text, exact=False):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         result = adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
@@ -26,11 +28,29 @@ def tap_label(text, exact=False):
             for n in root.iter("node"):
                 if (n.get("text", "") == text if exact else text in n.get("text", "")) and n.get("package") == PACKAGE:
                     left, top, right, bottom = map(int, re.findall(r"\d+", n.get("bounds")))
-                    adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
-                    time.sleep(1)
-                    return
+                    return (left+right)//2, (top+bottom)//2
         time.sleep(1)
     raise RuntimeError("Could not find " + text)
+
+def tap_label(text, exact=False):
+    x, y = wait_label(text, exact)
+    adb("shell", "input", "tap", str(x), str(y))
+
+def capture(name, label=None):
+    if label:
+        wait_label(label)
+    deadline = time.monotonic() + 50
+    time.sleep(2)
+    while time.monotonic() < deadline:
+        data = adb("exec-out", "screencap", "-p")
+        with Image.open(BytesIO(data)) as frame:
+            w, h = frame.size
+            central = frame.crop((w//4, h//3, w*3//4, h*2//3)).convert("L").resize((40, 30))
+            if sum(central.histogram()[:15]) < 0.65 * 40 * 30:
+                (OUT / (name + ".png")).write_bytes(data)
+                return
+        time.sleep(1)
+    raise RuntimeError("No visible game scene in " + name)
 
 for launch in ("first", "cached"):
     adb("shell", "am", "force-stop", PACKAGE)
@@ -49,19 +69,18 @@ for launch in ("first", "cached"):
         time.sleep(5)
         if not running():
             raise RuntimeError(f"{launch} launch exited after first frame")
-        (OUT / f"{launch}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+        capture(launch, "Play")
         print(f"Verified {launch} launch and showroom frame")
         if launch == "cached":
             tap_label("Play")
             for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
                 if index:
                     tap_label("▶", exact=True)
-                time.sleep(1)
-                (OUT / f"car-{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+                capture("car-" + name, name.upper())
             for screen, label in (("paint", "Next"), ("tracks", "Next"), ("grid", "01")):
                 tap_label(label)
                 if screen != "grid":
-                    (OUT / f"{screen}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+                    capture(screen, "PICK A COLOUR" if screen == "paint" else "WHERE TO RACE")
             deadline = time.monotonic() + 100
             while time.monotonic() < deadline:
                 if not running():
@@ -74,7 +93,7 @@ for launch in ("first", "cached"):
             time.sleep(5)
             if not running():
                 raise RuntimeError("Game exited during the race")
-            (OUT / "race.png").write_bytes(adb("exec-out", "screencap", "-p"))
+            capture("race")
             print("Verified race launch")
     finally:
         logs = adb("logcat", "-d", "-t", "5000")

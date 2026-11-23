@@ -61,10 +61,10 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         val n = 0.7071068f
         fun corner(right: Float, y: Float, u: Float, v: Float): Int =
             backdrop.vertex((-26f+right)*n,y,(-26f-right)*n,n,0f,n,Rgba.WHITE,u,v)
-        val bl = corner(-34f,-10.6f,0f,1f)
-        val br = corner(34f,-10.6f,1f,1f)
-        val tr = corner(34f,16.6f,1f,0f)
-        val tl = corner(-34f,16.6f,0f,0f)
+        val bl = corner(-34f,-10.6f,0f,0f)
+        val br = corner(34f,-10.6f,1f,0f)
+        val tr = corner(34f,16.6f,1f,1f)
+        val tl = corner(-34f,16.6f,0f,1f)
         backdrop.quadFacing(bl,br,tr,tl)
         val bitmap = android.graphics.BitmapFactory.decodeResource(resources,com.vroombuddies.game.R.drawable.festival_harbor)
         harborTexture = Textures.upload(engine,bitmap)
