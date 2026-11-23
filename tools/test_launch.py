@@ -14,7 +14,7 @@ def running():
     return subprocess.run(["adb", "shell", "pidof", PACKAGE], stdout=subprocess.DEVNULL).returncode == 0
 
 adb("install", "-r", "VroomBuddies-fixed.apk")
-for launch in ("empty,ibl,warm,fx,sun,post", "ibl,warm,fx,sun,post", "ibl", "warm", "fx", "sun", "post", "empty", "unlit"):
+for launch in ("ibl,warm", "ibl,fx", "ibl,sun", "ibl,post", "warm,fx", "warm,sun", "warm,post", "fx,sun", "fx,post", "sun,post", "warm,fx,sun,post", "ibl,fx,sun,post", "ibl,warm,sun,post", "ibl,warm,fx,post", "ibl,warm,fx,sun"):
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity", "--es", "probe", launch)
