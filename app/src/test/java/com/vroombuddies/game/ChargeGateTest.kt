@@ -19,7 +19,7 @@ class ChargeGateTest {
             race.phase = RacePhase.RACING
             fun cross(distance: Float, lane: Float) {
                 car.placeAt(track, distance, lane)
-                race.update(0f)
+                race.update(0.0001f)
             }
             car.energy = 0f
             cross(gate.s, gate.x + gate.halfWidth + 2f)

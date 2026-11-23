@@ -116,7 +116,12 @@ class TrackPath(val shape: TrackShape) {
         placeKnocks(rng)
         for (i in 0..2) {
             val target = length * (0.18f + i * 0.33f)
-            val s = (0..12).map { wrap(target + it * 14f) }.firstOrNull { pos ->
+            val spacing = 10f
+            val searchSteps = (length / (3f * spacing)).toInt()
+            val s = (0..searchSteps).asSequence().map { step ->
+                val offset = ((step + 1) / 2) * spacing * if (step % 2 == 0) -1 else 1
+                wrap(target + offset)
+            }.firstOrNull { pos ->
                 jumps.none { delta(it.s0, pos) in -30f..(it.length + 75f) } &&
                     pads.none { abs(delta(it.s, pos)) < 18f }
             } ?: continue
