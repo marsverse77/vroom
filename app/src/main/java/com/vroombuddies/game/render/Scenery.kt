@@ -194,7 +194,7 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
 }
 
 class Scenery(private val engine: Engine, private val scene: Scene, private val mats: MaterialLib, private val track: TrackPath, private val theme: Theme) {
-    private class CellEnts(val cell: SceneryLayout.Cell) { var eNear = 0; var eFar = 0; var eGlow = 0 }
+    private class CellEnts(val cell: SceneryLayout.Cell) { var eNear = 0; var eFar = 0; var eGlow = 0; var near: Boolean? = null }
     private val cells = ArrayList<CellEnts>()
     private val meshes = ArrayList<GpuMesh>()
     private val ents = ArrayList<Int>()
@@ -227,16 +227,25 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
 
     fun setWind(on: Boolean) = litMi.setParameter("wind", if (on) 1f else 0f)
 
-    /** Level of detail: near cells use the detailed batch, far cells the simple one. */
+    /**
+     * Level of detail: near cells use the detailed batch, far cells the simple one. A 60 m band between the
+     * switch-in and switch-out distances stops a cell flipping back and forth (visible popping) when the
+     * camera sits right on the boundary, and only cells that actually change are touched.
+     */
     fun updateLod(camX: Float, camZ: Float) {
         val rm = engine.renderableManager
-        for (c in cells) {
+        for (i in cells.indices) {
+            val c = cells[i]
             val d = hypot(c.cell.cx - camX, c.cell.cz - camZ)
-            val near = d < 520f
+            val near = when (c.near) { true -> d < LOD_OUT; false -> d < LOD_IN; null -> d < (LOD_IN + LOD_OUT) / 2 }
+            if (near == c.near) continue
+            c.near = near
             if (c.eNear != 0) rm.setLayerMask(rm.getInstance(c.eNear), 0xff, if (near) 0xff else 0)
             if (c.eFar != 0) rm.setLayerMask(rm.getInstance(c.eFar), 0xff, if (near) 0 else 0xff)
         }
     }
+
+    private companion object { const val LOD_IN = 500f; const val LOD_OUT = 560f }
 
     fun destroy() {
         for (e in ents) { scene.remove(e); engine.destroyEntity(e) }

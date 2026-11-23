@@ -334,7 +334,7 @@ object Menus {
         s.depthOfField = p == Preset.PRETTY || p == Preset.MAX
         s.foliageWind = p != Preset.SMOOTH
         s.fog = true
-        s.dynamicResolution = p != Preset.MAX
+        s.dynamicResolution = true
         s.targetFps = 60
     }
 
@@ -406,7 +406,7 @@ object Menus {
 
         section("Speed")
         option("Dynamic resolution", "Drops resolution a little to stay smooth", onOff, { s.dynamicResolution }, { s.dynamicResolution = it }, ::b)
-        option("Frame rate (V-Sync)", "60 is smoother, 30 saves battery", listOf(60, 30), { s.targetFps }, { s.targetFps = it }) { "$it fps" }
+        option("Frame rate (V-Sync)", "60 is steady, 120 needs a fast screen, 30 saves battery", listOf(60, 120, 30), { s.targetFps }, { s.targetFps = it }) { if (it == 120) "120 fps (fast screens)" else "$it fps" }
         list.addView(Ui.text(ctx, "Shadow, texture and anisotropy changes apply on the next race.", 12f, 0xccffffff.toInt(), outline = false), lp(t = 10f))
         list.setPadding(Ui.dpi(22f), Ui.dpi(10f), Ui.dpi(22f), Ui.dpi(22f))
 

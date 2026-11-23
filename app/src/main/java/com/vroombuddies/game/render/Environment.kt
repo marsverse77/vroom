@@ -63,10 +63,12 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
             mapSize = shadowMapSize
             shadowCascades = cascades
             shadowFar = 160f
-            stable = false
-            lispsm = true
-            constantBias = 0.002f
-            normalBias = 0.6f
+            // stable cascades: texels snap to the world so shadow edges don't crawl or shimmer while
+            // the camera races along (LiSPSM sharpens a little but swims with every camera move)
+            stable = true
+            lispsm = false
+            constantBias = 0.003f
+            normalBias = 0.8f
             screenSpaceContactShadows = shadowMapSize >= 2048
             stepCount = 8
             maxShadowDistance = 0.4f
@@ -126,8 +128,9 @@ class Environment(private val engine: Engine, private val scene: Scene, private 
     var starEntity = 0
 
     /** Keep the sky centred on the camera so it never gets closer. */
+    private val followMtx = Mat.identity()
     fun follow(cx: Float, cy: Float, cz: Float) {
-        val t = Mat.trs(cx, cy, cz)
+        val t = followMtx; t[12] = cx; t[13] = cy; t[14] = cz
         val tm = engine.transformManager
         if (skyEntity != 0) tm.setTransform(tm.getInstance(skyEntity), t)
         if (starEntity != 0) tm.setTransform(tm.getInstance(starEntity), t)

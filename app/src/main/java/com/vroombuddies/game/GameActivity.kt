@@ -23,7 +23,11 @@ import kotlin.concurrent.thread
  * Flow: loading (compile shaders once) -> title -> car -> paint -> track -> race -> result.
  */
 class GameActivity : Activity(), MenuHost {
-    companion object { init { Utils.init() } }
+    companion object {
+        init { Utils.init() }
+        private const val BOOTING = "booting"
+        private const val LOADING_RACE = "loadingRace"
+    }
 
     private lateinit var surface: SurfaceView
     private lateinit var overlay: FrameLayout
@@ -40,7 +44,8 @@ class GameActivity : Activity(), MenuHost {
     private var postFx: PostFx? = null
     private var surfaceW = 0; private var surfaceH = 0
     override lateinit var settings: GraphicsSettings
-    private val sound by lazy { Sound(this) }
+    private val soundLazy = lazy { Diagnostics.step("start sound"); Sound(this) }
+    private val sound by soundLazy
 
     private var showroom: Showroom? = null
     private var game: GameScene? = null
@@ -58,10 +63,28 @@ class GameActivity : Activity(), MenuHost {
     private var boostBtn: BoostButton? = null
     private var keyLeft = false; private var keyRight = false; private var keyBoost = false
     private var lastNanos = 0L
+    private var vsyncs = 0
+    private var frames = 0
+
+    private fun followRefreshRate() {
+        @Suppress("DEPRECATION")
+        val hz = surface.display?.refreshRate ?: return
+        if (kotlin.math.abs(hz - settings.displayHz) > 1f) { settings.displayHz = hz; settings.applyFrameRate(renderer) }
+    }
+    private var warmFrames = 0
+    private val WARM_FRAMES = 4
     private var aspect = 1.8f
+
+    private var engineReady = false
+    /** Started right after a crash: lowest settings, no extra effects pass, no screen-mode request. */
+    private var safeMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diagnostics.install(this)
+        val crashedBefore = Diagnostics.beginLaunch()
+        Diagnostics.step("app start")
+        choreographer = Choreographer.getInstance()
         Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
@@ -72,36 +95,79 @@ class GameActivity : Activity(), MenuHost {
         setContentView(root)
         hideSystemUi()
 
+        recoverFromCrash()
         settings = GraphicsSettings(this)
-        choreographer = Choreographer.getInstance()
-        displayHelper = DisplayHelper(this)
-        uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
-        uiHelper.renderCallback = SurfaceCallback()
-        uiHelper.attachTo(surface)
+        if (crashedBefore) {
+            // last launch died: show what we know, then offer a careful start
+            val report = Diagnostics.report()
+            Log.w("Vroom", report)
+            setScreen(Diagnostics.panel(this, "Vroom Buddies stopped last time", report, listOf(
+                "Start in safe mode" to { safeMode = true; useSafeSettings(); startGame() },
+                "Close" to { finish() })), swoosh = false)
+        } else startGame()
+    }
 
-        engine = Engine.create()
-        renderer = engine.createRenderer()
-        scene = engine.createScene()
-        view = engine.createView()
-        camera = engine.createCamera(EntityManager.get().create())
-        view.scene = scene; view.camera = camera
-        view.blendMode = View.BlendMode.OPAQUE
-        renderer.clearOptions = Renderer.ClearOptions().apply { clear = true; clearColor = doubleArrayOf(0.3, 0.6, 0.95, 1.0) }
-        camera.setExposure(1f)
-        settings.apply(view, renderer)
+    private fun useSafeSettings() {
+        settings.antiAliasing = AaMode.FXAA; settings.shadows = Level.OFF; settings.ssao = Level.OFF
+        settings.textureQuality = Level.MEDIUM; settings.anisotropic = Level.LOW; settings.effects = Level.LOW
+        settings.bloom = false; settings.reflections = false; settings.motionBlur = false; settings.godRays = false
+        settings.depthOfField = false; settings.foliageWind = false; settings.dynamicResolution = true; settings.targetFps = 60
+        settings.save()
+    }
 
-        mats = MaterialLib(this)
+    /** Something went wrong in a step we could catch: show it instead of closing. */
+    private fun showError(where: String, t: Throwable) {
+        Log.e("Vroom", "failed: $where", t)
+        val sw = java.io.StringWriter(); t.printStackTrace(java.io.PrintWriter(sw))
+        try {
+            setScreen(Diagnostics.panel(this, "Vroom Buddies hit a problem", Diagnostics.report("$where\n$sw"), listOf("Close" to { finish() })), swoosh = false)
+        } catch (_: Throwable) {}
+    }
+
+    private fun startGame() {
+        try {
+            if (!safeMode) pickDisplayMode()
+            Diagnostics.step("create engine")
+            displayHelper = DisplayHelper(this)
+            // our shaders are built for OpenGL ES only: never let Filament pick Vulkan on its own
+            engine = Engine.create(Engine.Backend.OPENGL)
+            Diagnostics.step("engine ok (${engine.backend}, feature level ${engine.activeFeatureLevel})")
+            renderer = engine.createRenderer()
+            scene = engine.createScene()
+            view = engine.createView()
+            camera = engine.createCamera(EntityManager.get().create())
+            view.scene = scene; view.camera = camera
+            view.blendMode = View.BlendMode.OPAQUE
+            renderer.clearOptions = Renderer.ClearOptions().apply { clear = true; clearColor = doubleArrayOf(0.3, 0.6, 0.95, 1.0) }
+            camera.setExposure(1f)
+            settings.apply(view, renderer)
+            engineReady = true
+            Diagnostics.step("attach surface")
+            uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
+            uiHelper.renderCallback = SurfaceCallback()
+            uiHelper.attachTo(surface)
+            mats = MaterialLib(this)
+        } catch (t: Throwable) { showError("starting the 3D engine", t); return }
+
         setScreen(Menus.loading(this, "Getting the cars ready..."))
-        thread(name = "materials") {
-            val pkgs = try { mats.preparePackages { } } catch (t: Throwable) { Log.e("Vroom", "material build failed", t); null }
+        // the shader compiler is deeply recursive: give it a big stack (normal threads get about 1 MB)
+        Thread(null, {
+            val pkgs = try { mats.preparePackages { } } catch (t: Throwable) { runOnUiThread { showError("building shaders", t) }; return@Thread }
             runOnUiThread {
-                if (pkgs == null) { setScreen(Menus.loading(this, "Oops! This phone can't run the game.")); return@runOnUiThread }
-                mats.create(engine, pkgs)
-                postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
-                ready = true
-                toTitle()
+                try {
+                    mats.create(engine, pkgs)
+                    Diagnostics.step("effects pass")
+                    if (!safeMode) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
+                    ready = true
+                    Diagnostics.step("title screen")
+                    toTitle()
+                } catch (t: Throwable) { showError("loading the game", t); return@runOnUiThread }
+                // the game reached the title screen and drew for a few seconds: this launch is healthy
+                overlay.postDelayed({
+                    if (game == null && showroom != null) { Diagnostics.step("title shown"); Diagnostics.launchOk(); boot.edit().putBoolean(BOOTING, false).apply() }
+                }, 3000)
             }
-        }
+        }, "materials", 64L * 1024 * 1024).start()
     }
 
     private fun hideSystemUi() {
@@ -133,7 +199,44 @@ class GameActivity : Activity(), MenuHost {
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
-    override fun applySettings() { settings.save(); settings.apply(view, renderer) }
+    private val boot by lazy { getSharedPreferences("boot", MODE_PRIVATE) }
+
+    /**
+     * Crash guard. If the last launch never reached the title screen, or the last race crashed while
+     * loading, start this time with default graphics settings (and rebuilt shaders after a startup crash)
+     * instead of crashing the same way again.
+     */
+    private fun recoverFromCrash() {
+        try {
+            if (boot.getBoolean(BOOTING, false) || boot.getBoolean(LOADING_RACE, false)) {
+                Log.w("Vroom", "previous run crashed while loading: resetting graphics settings")
+                getSharedPreferences("graphics", MODE_PRIVATE).edit().clear().commit()
+            }
+            if (boot.getBoolean(BOOTING, false)) java.io.File(filesDir, "materials").deleteRecursively()
+            boot.edit().putBoolean(BOOTING, true).putBoolean(LOADING_RACE, false).commit()
+        } catch (t: Throwable) { Log.w("Vroom", "crash guard", t) }
+    }
+
+    override fun applySettings() { settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
+
+    /**
+     * Ask for a screen mode that matches the frame-rate setting. A 120 Hz tablet asked to run a 60 fps game
+     * otherwise keeps refreshing at 120 Hz and every frame lands unevenly (judder). Switching the panel to
+     * 60 Hz, or drawing on every 2nd refresh when it can't switch, keeps frames perfectly even.
+     */
+    private fun pickDisplayMode() {
+        try {
+            @Suppress("DEPRECATION")
+            val d = (if (android.os.Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
+            val cur = d.mode
+            val modes = d.supportedModes.filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+            val want = settings.targetFps.toFloat()
+            // the slowest mode that still reaches the target; a screen that can't reach it runs flat out
+            val best = modes.filter { it.refreshRate >= want - 1f }.minByOrNull { it.refreshRate } ?: modes.maxByOrNull { it.refreshRate } ?: cur
+            if (window.attributes.preferredDisplayModeId != best.modeId) window.attributes = window.attributes.also { it.preferredDisplayModeId = best.modeId }
+            settings.displayHz = best.refreshRate
+        } catch (t: Throwable) { Log.w("Vroom", "display mode", t) }
+    }
     override fun click() = sound.play("click")
     override fun stars(themeIndex: Int) = getSharedPreferences("progress", MODE_PRIVATE).getInt("stars$themeIndex", 0)
 
@@ -142,13 +245,23 @@ class GameActivity : Activity(), MenuHost {
         setScreen(Menus.loading(this, "Building ${Themes.all[themeIndex].name}..."))
         // let the loading screen draw before the heavy build
         overlay.postDelayed({
+            boot.edit().putBoolean(LOADING_RACE, true).commit()
+            try {
+            Diagnostics.step("build track ${Themes.all[themeIndex].name}")
             showroom?.destroy(); showroom = null
             game?.destroy()
             settings.apply(view, renderer)
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
+            // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
+            // instead of letting the collector wake up in the middle of the race
+            Runtime.getRuntime().gc()
             sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
-            showHud()
+            // draw a few hidden frames with every effect on (still behind the loading screen) so shaders,
+            // shadow maps and post-processing buffers are all ready before the countdown appears
+            warmFrames = WARM_FRAMES
+            Diagnostics.step("warm up ${Themes.all[themeIndex].name}")
+            } catch (t: Throwable) { game = null; showError("building ${Themes.all[themeIndex].name}", t) }
         }, 120)
     }
 
@@ -213,11 +326,29 @@ class GameActivity : Activity(), MenuHost {
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             choreographer.postFrameCallback(this)
+            if (!engineReady) return
+            // the screen may switch modes a moment after we ask (or refuse): follow its real refresh rate
+            if ((frames++ and 63) == 0) followRefreshRate()
+            // frame pacing: on a fast screen that couldn't switch to the game's frame rate, draw on every Nth refresh
+            val interval = settings.frameInterval
+            if (interval > 1 && (vsyncs++ % interval) != 0) return
             val dt = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceIn(0.001f, 0.05f)
             lastNanos = frameTimeNanos
             if (!ready) return
             val g = game
-            if (g != null) {
+            if (g != null && warmFrames > 0) {
+                g.warming = true
+                g.update(1f / 60f, 0f, false)
+                g.post.force = true
+                if (settings.depthOfField) settings.setDof(view, true, 8f, camera)
+                if (--warmFrames == 0) {
+                    g.warming = false; g.post.force = false
+                    boot.edit().putBoolean(LOADING_RACE, false).apply()
+                    Diagnostics.step("racing")
+                    settings.setDof(view, false, 8f, camera)
+                    showHud()
+                }
+            } else if (g != null) {
                 if (!paused) {
                     val steer = ((if (right?.held == true || keyRight) 1f else 0f) - (if (left?.held == true || keyLeft) 1f else 0f))
                     val boost = (boostBtn?.tapped == true) || keyBoost
@@ -251,6 +382,7 @@ class GameActivity : Activity(), MenuHost {
     override fun onDestroy() {
         super.onDestroy()
         choreographer.removeFrameCallback(frameCallback)
+        if (!engineReady) { if (soundLazy.isInitialized()) sound.release(); return }
         game?.destroy(); showroom?.destroy()
         postFx?.destroy(view)
         uiHelper.detach()
@@ -273,6 +405,7 @@ class GameActivity : Activity(), MenuHost {
         override fun onResized(width: Int, height: Int) {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
+            settings.screenW = width; settings.screenH = height; settings.apply(view, renderer)
             surfaceW = width; surfaceH = height; postFx?.resize(width, height)
             game?.setAspect(aspect); showroom?.setAspect(aspect)
         }
