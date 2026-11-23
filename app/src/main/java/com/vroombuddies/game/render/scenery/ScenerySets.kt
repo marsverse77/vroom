@@ -11,5 +11,6 @@ object ScenerySets {
     val packs: List<SceneryPack> = listOf(
         // DesertScenery.pack,
         SpaceScenery.pack,
+        FunTownScenery.pack,
     )
 }
