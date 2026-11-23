@@ -33,16 +33,16 @@ class SteerButton(ctx: Context, private val dir: Int) : View(ctx) {
     private val rf = RectF()
     override fun onDraw(c: Canvas) {
         val w = width.toFloat(); val h = height.toFloat(); val d = min(w, h) - Ui.dp(6f)
-        val lip = if (held) Ui.dp(3f) else Ui.dp(9f)
+        val lip = if (held) Ui.dp(2f) else Ui.dp(5f)
         val top = (h - d) / 2 + (if (held) Ui.dp(6f) else 0f)
         rf.set((w - d) / 2, top, (w + d) / 2, top + d - (if (held) Ui.dp(6f) else 0f))
-        Ui.drawChunky(c, rf, d / 2, if (held) Ui.YELLOW else Ui.SKY, lip = lip, outline = Ui.dp(4f), p = p)
+        Ui.drawChunky(c, rf, d / 2, if (held) Ui.ACCENT else 0xd92c313b.toInt(), lip = lip, outline = Ui.dp(1.5f), p = p)
         // arrow: white with an ink outline
         val cx = w / 2; val cy = rf.top + (rf.height() - lip) / 2; val a = d * 0.22f
         path.reset()
         path.moveTo(cx + dir * a * 1.05f, cy); path.lineTo(cx - dir * a * 0.65f, cy - a); path.lineTo(cx - dir * a * 0.65f, cy + a); path.close()
         p.shader = null; p.pathEffect = CornerPathEffect(Ui.dp(5f))
-        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(7f); p.strokeJoin = Paint.Join.ROUND; p.color = Ui.INK; c.drawPath(path, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(3f); p.strokeJoin = Paint.Join.ROUND; p.color = Ui.INK; c.drawPath(path, p)
         p.style = Paint.Style.FILL; p.color = Color.WHITE; c.drawPath(path, p)
         p.pathEffect = null
     }
@@ -75,12 +75,12 @@ class BoostButton(ctx: Context) : View(ctx) {
         p.style = Paint.Style.FILL; p.shader = null
         if (ready) { p.color = if (boosting) 0x88ffffff.toInt() else 0x66ffb300; c.drawCircle(cx, cy + lip / 2, r + Ui.dp(9f) + abs(wob) * 2, p) }
         // ink outline + lip + body
-        p.color = Ui.INK; c.drawCircle(cx, cy + lip, r + Ui.dp(4f), p); c.drawCircle(cx, cy, r + Ui.dp(4f), p)
-        p.color = if (ready) 0xffa3164a.toInt() else 0xff3e3e56.toInt(); c.drawCircle(cx, cy + lip, r, p)
+        p.color = Ui.INK; c.drawCircle(cx, cy, r + Ui.dp(2f), p)
+        p.color = 0x66000000; c.drawCircle(cx, cy + lip, r, p)
         val key = (if (ready) 1 else 0) + 2 * width + 100000 * height
         if (key != gradKey || grad == null) {
             gradKey = key
-            grad = RadialGradient(w / 2, h / 2 - r * 0.5f, r * 1.5f, if (ready) 0xffff8cc4.toInt() else 0xffa9a9c0.toInt(), if (ready) 0xffff2d6f.toInt() else 0xff5e5e78.toInt(), Shader.TileMode.CLAMP)
+            grad = RadialGradient(w / 2, h / 2 - r * 0.5f, r * 1.5f, if (ready) 0xffff5a5f.toInt() else 0xff4a505c.toInt(), if (ready) 0xffb3121a.toInt() else 0xff23262d.toInt(), Shader.TileMode.CLAMP)
         }
         p.color = Color.BLACK; p.shader = grad
         c.drawCircle(cx, cy, r, p); p.shader = null
@@ -101,7 +101,7 @@ class BoostButton(ctx: Context) : View(ctx) {
             lineTo(cx - s * 0.2f, cy + s); lineTo(cx + s * 0.45f, cy - s * 0.2f); lineTo(cx + s * 0.02f, cy - s * 0.2f); close()
         }
         p.strokeJoin = Paint.Join.ROUND
-        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(7f); p.color = Ui.INK; c.drawPath(bolt, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(3f); p.color = Ui.INK; c.drawPath(bolt, p)
         p.style = Paint.Style.FILL; p.color = if (ready) 0xffffe14d.toInt() else Color.WHITE; c.drawPath(bolt, p)
     }
 }
@@ -127,9 +127,10 @@ class HudOverlay(ctx: Context) : View(ctx) {
 
     private fun outlined(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int) {
         txt.textSize = size
-        txt.style = Paint.Style.STROKE; txt.strokeWidth = (size * 0.17f).coerceAtMost(Ui.dp(12f)); txt.strokeJoin = Paint.Join.ROUND; txt.color = Ui.INK
-        c.drawText(s, x, y + txt.strokeWidth * 0.5f, txt)
+        txt.style = Paint.Style.STROKE; txt.strokeWidth = (size * 0.07f).coerceIn(Ui.dp(1.2f), Ui.dp(5f)); txt.strokeJoin = Paint.Join.ROUND; txt.color = Ui.INK
+        txt.setShadowLayer(Ui.dp(4f), 0f, Ui.dp(2f), 0xaa000000.toInt())
         c.drawText(s, x, y, txt)
+        txt.clearShadowLayer()
         txt.style = Paint.Style.FILL; txt.color = color
         c.drawText(s, x, y, txt)
     }
@@ -170,7 +171,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
         p.strokeWidth = Ui.dp(9f); p.color = 0x66ffffff; c.drawArc(rf, 182f, 176f, false, p)
         val f = (s.speedKmh / 300f).coerceIn(0f, 1f)
         if (f > 0.01f) {
-            p.color = when { s.boosting -> 0xffffe14d.toInt(); f < 0.5f -> Ui.GREEN; f < 0.8f -> 0xffffc61a.toInt(); else -> Ui.RED }
+            p.color = when { s.boosting -> Ui.GOLD; f < 0.8f -> Color.WHITE; else -> Ui.ACCENT }
             c.drawArc(rf, 182f, 176f * f, false, p)
         }
         p.style = Paint.Style.FILL; p.strokeCap = Paint.Cap.BUTT
@@ -208,7 +209,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
         val m = map ?: TrackMaps.of(tr).also { map = it }
         val size = Ui.dp(84f); val l = Ui.dp(28f); val tp = Ui.dp(128f) // under the place badge, above the steering pads
         rf.set(l - Ui.dp(8f), tp - Ui.dp(8f), l + size + Ui.dp(8f), tp + size + Ui.dp(12f))
-        Ui.drawChunky(c, rf, Ui.dp(18f), 0xcc2b2f6b.toInt(), lip = Ui.dp(4f), outline = Ui.dp(3f), gloss = false, p = p)
+        Ui.drawChunky(c, rf, Ui.dp(8f), 0xc015171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p)
         TrackMaps.drawOutline(c, m, l, tp, size, p, mapPath, 0xffeeeeff.toInt(), Ui.INK, Ui.dp(4f))
         p.style = Paint.Style.FILL
         val lapLen = s.laps * tr.length
@@ -227,9 +228,9 @@ class HudOverlay(ctx: Context) : View(ctx) {
     private fun drawEnergyBar(c: Canvas, s: HudState, w: Float, h: Float) {
         val cells = 4; val cw = Ui.dp(34f); val gap = Ui.dp(6f); val ch = Ui.dp(24f)
         val total = cells * cw + (cells - 1) * gap
-        val cx = w - Ui.dp(18f) - Ui.dp(85f); val x0 = cx - total / 2; val y0 = h - Ui.dp(14f) - Ui.dp(170f) - ch - Ui.dp(14f)
+        val cx = w - Ui.dp(18f) - Ui.dp(Ui.BOOST_SIZE / 2); val x0 = cx - total / 2; val y0 = h - Ui.dp(14f) - Ui.dp(Ui.BOOST_SIZE) - ch - Ui.dp(12f)
         rf.set(x0 - Ui.dp(10f), y0 - Ui.dp(9f), x0 + total + Ui.dp(10f), y0 + ch + Ui.dp(13f))
-        Ui.drawChunky(c, rf, Ui.dp(16f), Ui.NAVY, lip = Ui.dp(4f), outline = Ui.dp(3.5f), gloss = false, p = p)
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(8f))
         val e = s.energy.coerceIn(0f, 100f) / 25f
         for (i in 0 until cells) {
             val x = x0 + i * (cw + gap)
@@ -258,10 +259,10 @@ class HudOverlay(ctx: Context) : View(ctx) {
         if (s.letterbox > 0.5f) return
 
         // place badge: chunky medal, big number with a small suffix
-        val medal = when (s.place) { 1 -> 0xffffc61a.toInt(); 2 -> 0xffd6dde6.toInt(); 3 -> 0xffe0915a.toInt(); else -> 0xff7a8cff.toInt() }
+        val medal = when (s.place) { 1 -> 0xffffc61a.toInt(); 2 -> 0xffd6dde6.toInt(); 3 -> 0xffe0915a.toInt(); else -> Ui.STEEL }
         val bx = Ui.dp(62f); val by = Ui.dp(58f); val br = Ui.dp(46f)
         rf.set(bx - br, by - br, bx + br, by + br + Ui.dp(6f))
-        Ui.drawChunky(c, rf, br, medal, lip = Ui.dp(7f), outline = Ui.dp(4f), p = p)
+        Ui.drawChunky(c, rf, br, medal, lip = Ui.dp(4f), outline = Ui.dp(1.5f), p = p)
         val num = s.place.toString(); val suf = ordinal(s.place).removePrefix(num)
         txt.textSkewX = Ui.SLANT
         outlined(c, num, bx - Ui.dp(9f), by + Ui.dp(17f), Ui.dp(50f), Color.WHITE)
@@ -271,7 +272,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
         // lap pill
         val lw = Ui.dp(118f); val lx = w - lw - Ui.dp(16f); val ly = Ui.dp(14f)
         rf.set(lx, ly, lx + lw, ly + Ui.dp(50f))
-        Ui.drawChunky(c, rf, Ui.dp(25f), Ui.NAVY, lip = Ui.dp(5f), outline = Ui.dp(3.5f), gloss = false, p = p)
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), outline = Ui.dp(1.5f), gloss = false, p = p, slant = Ui.dp(10f))
         drawFlag(c, lx + Ui.dp(24f), ly + Ui.dp(22f), Ui.dp(22f))
         outlined(c, "${s.lap}/${s.laps}", lx + lw * 0.62f, ly + Ui.dp(33f), Ui.dp(27f), Color.WHITE)
 
@@ -281,7 +282,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
         // race strip: a chunky road with a chequered finish and every racer as a dot
         val x0 = Ui.dp(136f); val x1 = w - Ui.dp(156f); val y = Ui.dp(38f)
         rf.set(x0 - Ui.dp(14f), y - Ui.dp(14f), x1 + Ui.dp(28f), y + Ui.dp(17f))
-        Ui.drawChunky(c, rf, Ui.dp(15f), 0xff3a3f63.toInt(), lip = Ui.dp(4f), outline = Ui.dp(3.5f), gloss = false, p = p)
+        Ui.drawChunky(c, rf, Ui.dp(6f), 0xd915171c.toInt(), lip = Ui.dp(3f), gloss = false, p = p, slant = Ui.dp(10f))
         // dashed centre line
         p.color = 0x55ffffff
         var dx = x0; while (dx < x1) { c.drawRoundRect(dx, y - Ui.dp(1.5f), dx + Ui.dp(10f), y + Ui.dp(1.5f), Ui.dp(1.5f), Ui.dp(1.5f), p); dx += Ui.dp(22f) }
@@ -328,7 +329,7 @@ class HudOverlay(ctx: Context) : View(ctx) {
 }
 
 /**
- * End of race. A win gets spinning sun rays, confetti bursts, rainbow bouncing letters and stars that
+ * End of race. A win gets soft light rays, gold and red confetti, letters that drop in and stars that
  * stamp in one by one. Other places still get a happy screen, because every race should feel good.
  */
 class ResultView(
@@ -338,16 +339,15 @@ class ResultView(
     init {
         val win = place == 1
         setBackgroundColor(if (win) 0x22000000 else 0x55000000)
-        if (place <= 3) addView(SunburstView(ctx, if (win) 0x55ffd23f else 0x3340c4ff, if (win) 0x33ff7a1a else 0x222a7bff), LayoutParams(-1, -1).apply { gravity = Gravity.CENTER })
+        if (place <= 3) addView(SunburstView(ctx, if (win) 0x30ffd27a else 0x22ffffff, if (win) 0x10ffffff else 0x0affffff), LayoutParams(-1, -1).apply { gravity = Gravity.CENTER })
         val confetti = if (place <= 3) ConfettiView(ctx, if (win) 170 else 70) else null
         val col = Ui.col(ctx)
         val trophy = Ui.text(ctx, when (place) { 1 -> "🏆"; 2 -> "🥈"; 3 -> "🥉"; else -> "⭐" }, 64f, outline = false)
         col.addView(trophy)
-        val titleText = if (win) "YOU WIN!" else "${place}${if (place == 2) "nd" else if (place == 3) "rd" else "th"} place!"
+        val titleText = if (win) "YOU WIN!" else "${place}${if (place == 2) "ND" else if (place == 3) "RD" else "TH"} PLACE"
         val titleRow = Ui.row(ctx)
-        val rainbow = intArrayOf(Ui.PINK, Ui.ORANGE, Ui.YELLOW, Ui.GREEN, Ui.BLUE, Ui.PURPLE)
         val letters = titleText.mapIndexed { i, ch ->
-            Ui.text(ctx, ch.toString(), 60f, if (win) rainbow[i % rainbow.size] else Color.WHITE, slant = true).also { it.rotation = if (i % 2 == 0) -4f else 4f; titleRow.addView(it, android.widget.LinearLayout.LayoutParams(-2, -2).apply { rightMargin = when { i == titleText.length - 1 -> 0; ch == ' ' -> -Ui.dpi(2f); else -> -Ui.dpi(20f) } }) }
+            Ui.text(ctx, ch.toString(), 58f, if (win && i >= 4) Ui.GOLD else Color.WHITE, slant = true).also { titleRow.addView(it, android.widget.LinearLayout.LayoutParams(-2, -2).apply { rightMargin = when { i == titleText.length - 1 -> 0; ch == ' ' -> Ui.dpi(6f); else -> -Ui.dpi(10f) } }) }
         }
         titleRow.setPadding(Ui.dpi(6f), 0, Ui.dpi(34f), 0)
         col.addView(titleRow)
@@ -357,7 +357,7 @@ class ResultView(
             Menus.StarsView(ctx, if (i < stars) 1 else 0, 1).also { it.alpha = 0f; starRow.addView(it, android.widget.LinearLayout.LayoutParams(Ui.dpi(sz), Ui.dpi(sz)).apply { setMargins(Ui.dpi(4f), if (i == 1) 0 else Ui.dpi(12f), Ui.dpi(4f), 0) }) }
         }
         col.addView(starRow)
-        val sub = Menus.banner(ctx, if (win) "Super speedy racing!" else "Great job! Let's go again!", if (win) Ui.PINK else Ui.BLUE, 22f)
+        val sub = Menus.banner(ctx, if (win) "Champion!" else "Great race!", Ui.ACCENT, 22f)
         col.addView(sub)
         val row = Ui.row(ctx)
         fun lpb(sz: Float) = android.widget.LinearLayout.LayoutParams(Ui.dpi(sz), Ui.dpi(sz)).apply { setMargins(Ui.dpi(14f), 0, Ui.dpi(14f), 0) }

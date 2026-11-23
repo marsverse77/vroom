@@ -15,41 +15,54 @@ import android.widget.TextView
 import com.vroombuddies.game.R
 
 /**
- * Shared cartoon look. Everything has a thick ink outline, a darker "lip" underneath so it looks like a
- * chunky toy you can press, and a glossy highlight on top. Titles lean forward a little so they feel fast.
+ * Shared racing look: carbon and steel surfaces, slanted buttons, italic white type and one red accent.
+ * Controls stay big and simple for small hands; the styling is what makes it feel like a racing game.
  */
 object Ui {
     var density = 1f
     fun dp(v: Float) = v * density
     fun dpi(v: Float) = (v * density).toInt()
 
-    /** Rounded, friendly display font (Fredoka Bold, SIL OFL). Falls back to a heavy system font. */
-    var font: Typeface = Typeface.create("sans-serif-black", Typeface.BOLD); private set
+    /** Sporty display font (Exo 2 ExtraBold Italic, SIL OFL), plus a bold upright cut for small print. */
+    var font: Typeface = Typeface.create("sans-serif-black", Typeface.BOLD_ITALIC); private set
+    var fontPlain: Typeface = Typeface.create("sans-serif", Typeface.BOLD); private set
 
     fun init(ctx: Context) {
         density = ctx.resources.displayMetrics.density
-        font = try { ctx.resources.getFont(R.font.fredoka_bold) } catch (t: Throwable) { font }
+        font = try { ctx.resources.getFont(R.font.exo2_extrabold_italic) } catch (t: Throwable) { font }
+        fontPlain = try { ctx.resources.getFont(R.font.exo2_bold) } catch (t: Throwable) { fontPlain }
     }
 
-    const val YELLOW = 0xffffd23f.toInt()
-    const val ORANGE = 0xffff7a1a.toInt()
-    const val PINK = 0xffff3d8b.toInt()
-    const val BLUE = 0xff2a7bff.toInt()
-    const val SKY = 0xff3fc6ff.toInt()
-    const val GREEN = 0xff3ccf4e.toInt()
-    const val PURPLE = 0xff8a4dff.toInt()
-    const val RED = 0xffff4646.toInt()
-    const val INK = 0xff1d1b3a.toInt()
-    const val NAVY = 0xff2b2f6b.toInt()
+    // Racing palette: carbon and steel surfaces, white type, one hot red accent and gold for wins/boost.
+    // The old names are kept so every screen picks the palette up from one place.
+    const val ACCENT = 0xffe8202a.toInt()      // racing red: primary actions
+    const val GOLD = 0xffffb81c.toInt()        // boost, stars, first place
+    const val STEEL = 0xff2c313b.toInt()       // secondary buttons
+    const val CARBON = 0xff15171c.toInt()      // panels
+    const val YELLOW = GOLD
+    const val ORANGE = STEEL
+    const val PINK = ACCENT
+    const val BLUE = STEEL
+    const val SKY = STEEL
+    const val GREEN = ACCENT
+    const val PURPLE = STEEL
+    const val RED = ACCENT
+    const val INK = 0xff0a0b0e.toInt()
+    const val NAVY = CARBON
+    const val OFF = 0xff5a606c.toInt()
 
-    /** Forward lean for fast titles. */
-    const val SLANT = -0.18f
+    /** Race controls (dp): still big for small hands. */
+    const val STEER_SIZE = 122f
+    const val BOOST_SIZE = 146f
+
+    /** The italic font already leans; this adds a touch more for big titles. */
+    const val SLANT = -0.06f
 
     fun text(ctx: Context, s: String, sizeSp: Float, color: Int = Color.WHITE, outline: Boolean = true, slant: Boolean = false): TextView =
         OutlinedText(ctx, outline).apply {
             text = s; textSize = sizeSp; typeface = font; setTextColor(color); gravity = Gravity.CENTER
-            includeFontPadding = false
-            if (slant) { paint.textSkewX = SLANT; setPadding(paddingLeft, paddingTop, paddingRight + (textSize * 0.22f).toInt(), paddingBottom) }
+            includeFontPadding = false; letterSpacing = 0.02f
+            if (slant) { paint.textSkewX = SLANT; setPadding(paddingLeft, paddingTop, paddingRight + (textSize * 0.12f).toInt(), paddingBottom) }
         }
 
     fun lighten(c: Int, k: Float): Int {
@@ -62,63 +75,76 @@ object Ui {
     private val chunkyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tmp = RectF()
 
+    private val path = Path()
+
     /**
-     * Draw a chunky toy shape into [r]: ink outline, darker lip of [lip] px under the body, body gradient and a
-     * glossy stripe across the top. [r] includes the lip. Used by buttons, panels and the HUD so they all match.
+     * Draw a sleek racing-style shape into [r]: soft drop shadow ([lip] px), thin dark edge, a brushed
+     * gradient body and a fine highlight along the top edge. With [slant] > 0 it becomes a parallelogram
+     * leaning forward. Buttons, panels and HUD parts all use this so they match.
      */
-    fun drawChunky(c: Canvas, r: RectF, radius: Float, color: Int, lip: Float = dp(6f), outline: Float = dp(3.5f), gloss: Boolean = true, p: Paint = chunkyPaint) {
-        val o = outline / 2
-        p.shader = null; p.style = Paint.Style.FILL
-        // ink silhouette (outline) under everything
-        p.color = INK
-        c.drawRoundRect(r, radius, radius, p)
-        // lip
-        tmp.set(r.left + outline, r.top + outline, r.right - outline, r.bottom - outline)
-        p.color = darken(color, 0.38f); c.drawRoundRect(tmp, radius - o, radius - o, p)
-        // body
-        tmp.set(r.left + outline, r.top + outline, r.right - outline, r.bottom - outline - lip)
-        p.shader = LinearGradient(0f, tmp.top, 0f, tmp.bottom, lighten(color, 0.22f), color, Shader.TileMode.CLAMP)
-        c.drawRoundRect(tmp, radius - o, radius - o, p); p.shader = null
-        if (gloss) {
-            val gh = (tmp.height() * 0.38f)
-            val inset = min(radius * 0.45f, tmp.width() * 0.2f)
-            tmp.set(tmp.left + inset, tmp.top + outline * 0.6f, tmp.right - inset, tmp.top + outline * 0.6f + gh)
-            p.color = 0x55ffffff; c.drawRoundRect(tmp, gh / 2, gh / 2, p)
+    fun drawChunky(c: Canvas, r: RectF, radius: Float, color: Int, lip: Float = dp(4f), outline: Float = dp(1.5f), gloss: Boolean = true, p: Paint = chunkyPaint, slant: Float = 0f) {
+        p.shader = null; p.style = Paint.Style.FILL; p.pathEffect = null
+        val bodyBottom = r.bottom - lip
+        fun shape(l: Float, t: Float, rr: Float, b: Float, rad: Float) {
+            path.reset()
+            if (slant > 0f) {
+                p.pathEffect = CornerPathEffect(rad)
+                path.moveTo(l + slant, t); path.lineTo(rr, t); path.lineTo(rr - slant, b); path.lineTo(l, b); path.close()
+            } else { p.pathEffect = null; tmp.set(l, t, rr, b); path.addRoundRect(tmp, rad, rad, Path.Direction.CW) }
         }
+        // shadow
+        p.color = 0x66000000; shape(r.left, r.top + lip, r.right, r.bottom, radius); c.drawPath(path, p)
+        // edge
+        p.color = INK; shape(r.left, r.top, r.right, bodyBottom, radius); c.drawPath(path, p)
+        // body
+        shape(r.left + outline, r.top + outline, r.right - outline, bodyBottom - outline, radius - outline / 2)
+        p.shader = LinearGradient(0f, r.top, 0f, bodyBottom, lighten(color, 0.14f), darken(color, 0.12f), Shader.TileMode.CLAMP)
+        c.drawPath(path, p); p.shader = null
+        if (gloss) {
+            // fine highlight on the top edge and a soft sheen over the upper half
+            p.color = 0x22ffffff
+            shape(r.left + outline, r.top + outline, r.right - outline, r.top + (bodyBottom - r.top) * 0.48f, radius - outline / 2)
+            c.drawPath(path, p)
+            p.color = 0x66ffffff; p.style = Paint.Style.STROKE; p.strokeWidth = dp(1f)
+            val inset = radius.coerceAtMost((r.width()) * 0.3f)
+            c.drawLine(r.left + inset + slant * 0.9f, r.top + outline + dp(0.5f), r.right - inset, r.top + outline + dp(0.5f), p)
+            p.style = Paint.Style.FILL
+        }
+        p.pathEffect = null
     }
     private fun min(a: Float, b: Float) = if (a < b) a else b
 
     /** Drawable version of [drawChunky] for view backgrounds. */
-    class ChunkyDrawable(var color: Int, private val radius: Float, val lip: Float = dp(6f), private val outline: Float = dp(3.5f), private val gloss: Boolean = true) : Drawable() {
+    class ChunkyDrawable(var color: Int, private val radius: Float, val lip: Float = dp(4f), private val outline: Float = dp(1.5f), private val gloss: Boolean = true, private val slant: Float = 0f) : Drawable() {
         private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val r = RectF()
-        override fun draw(c: Canvas) { r.set(bounds); drawChunky(c, r, kotlin.math.min(radius, r.height() / 2), color, lip, outline, gloss, p) }
+        override fun draw(c: Canvas) { r.set(bounds); drawChunky(c, r, kotlin.math.min(radius, r.height() / 2), color, lip, outline, gloss, p, slant) }
         override fun setAlpha(alpha: Int) {}
         override fun setColorFilter(cf: ColorFilter?) {}
         @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
     }
 
-    /** Semi-see-through rounded card with an ink outline: for name plates, stats and settings. */
-    fun panel(color: Int = 0xe62b2f6b.toInt(), radius: Float = 24f) = ChunkyDrawable(color, dp(radius), lip = dp(5f), gloss = false)
+    /** Dark see-through card: for name plates, stats and settings. */
+    fun panel(color: Int = 0xe015171c.toInt(), radius: Float = 10f) = ChunkyDrawable(color, dp(radius), lip = dp(3f), gloss = false)
 
-    /** Big cartoon button: squishes and sinks into its lip when pressed, springs back. */
+    /** Slanted racing button: dips when pressed, springs back. */
     @SuppressLint("ClickableViewAccessibility")
     fun button(ctx: Context, label: String, color: Int, sizeSp: Float = 26f, onClick: () -> Unit): TextView = makeButton(ctx, label, color, sizeSp, false, onClick)
 
     @SuppressLint("ClickableViewAccessibility")
     fun makeButton(ctx: Context, label: String, color: Int, sizeSp: Float, round: Boolean, onClick: () -> Unit): TextView =
-        text(ctx, label, sizeSp).apply {
+        text(ctx, if (round) label else label.uppercase(), sizeSp * 0.8f).apply {
             (this as OutlinedText).square = round
-            val bg = ChunkyDrawable(color, dp(if (round) 200f else 22f), lip = dp(7f))
+            val bg = ChunkyDrawable(color, dp(if (round) 200f else 7f), lip = dp(4f), slant = if (round) 0f else dp(12f))
             background = bg
             // round buttons get slim vertical padding: a TextView whose text overflows scrolls, and that
             // would shift the background up and clip the bottom of the circle
-            if (round) setPadding(dpi(14f), dpi(4f), dpi(14f), dpi(4f) + bg.lip.toInt())
-            else setPadding(dpi(26f), dpi(10f), dpi(26f), dpi(12f) + bg.lip.toInt())
+            if (round) setPadding(dpi(10f), dpi(3f), dpi(10f), dpi(3f) + bg.lip.toInt())
+            else setPadding(dpi(28f), dpi(7f), dpi(28f), dpi(9f) + bg.lip.toInt())
             setOnTouchListener { v, e ->
                 when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.92f).scaleY(0.88f).translationY(dp(3f)).setDuration(70).start()
+                    MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.94f).scaleY(0.94f).translationY(dp(2f)).setDuration(60).start()
                     MotionEvent.ACTION_UP -> {
-                        v.animate().scaleX(1f).scaleY(1f).translationY(0f).setInterpolator(OvershootInterpolator(4f)).setDuration(260).start()
+                        v.animate().scaleX(1f).scaleY(1f).translationY(0f).setInterpolator(OvershootInterpolator(2f)).setDuration(200).start()
                         if (e.x in 0f..v.width.toFloat() && e.y in 0f..v.height.toFloat()) onClick()
                     }
                     MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).translationY(0f).setDuration(120).start()
@@ -148,8 +174,7 @@ object Ui {
 }
 
 /**
- * Cartoon text: a thick ink outline with a hard drop shadow under it, then the colour on top.
- * The outline is a real stroke, so it reads over any 3D background.
+ * Display text: a thin dark edge and a soft shadow under the colour, so it reads over any 3D background.
  */
 class OutlinedText(ctx: Context, private val outline: Boolean) : TextView(ctx) {
     private var drawing = false
@@ -176,12 +201,12 @@ class OutlinedText(ctx: Context, private val outline: Boolean) : TextView(ctx) {
         if (!outline) { super.onDraw(c); return }
         drawing = true
         val fill = currentTextColor
-        val sw = (textSize * 0.16f).coerceIn(Ui.dp(2.5f), Ui.dp(9f))
+        val sw = (textSize * 0.06f).coerceIn(Ui.dp(1.2f), Ui.dp(4f))
         paint.strokeJoin = Paint.Join.ROUND
-        // pass 1: stroke + hard shadow
+        // pass 1: thin dark edge + soft shadow, so white type reads over a bright 3D scene
         paint.style = Paint.Style.STROKE; paint.strokeWidth = sw
         setTextColor(strokeColor)
-        paint.setShadowLayer(0.01f, 0f, sw * 0.55f, strokeColor)
+        paint.setShadowLayer(Ui.dp(4f), 0f, Ui.dp(2f), 0xaa000000.toInt())
         super.onDraw(c)
         // pass 2: fill
         paint.clearShadowLayer()

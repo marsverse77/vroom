@@ -74,10 +74,10 @@ class Showroom(private val engine: Engine, private val scene: Scene, private val
         val a = t * 0.5f + spinBoost * spinBoost * 4f
         val hop = abs(sin(t * 2.2f)) * 0.05f
         car?.update(Mat.trs(0f, hop, 0f, 0f, a, 0f), 0f, 0f, 0f, sin(t) * 0.3f, t * 4f, 0f, t, false)
-        val ex = 8.5f; val ey = 3.2f; val ez = 8.5f
+        val ex = 6.6f; val ey = 2.6f; val ez = 6.6f
         camera.setProjection(38.0, aspect.toDouble(), 0.3, 3000.0, Camera.Fov.VERTICAL)
         camera.setShift(offsetX.toDouble(), offsetY.toDouble())
-        camera.lookAt(ex.toDouble(), ey.toDouble(), ez.toDouble(), 0.0, 1.0, 0.0, 0.0, 1.0, 0.0)
+        camera.lookAt(ex.toDouble(), ey.toDouble(), ez.toDouble(), 0.0, 0.9, 0.0, 0.0, 1.0, 0.0)
         env.follow(ex, ey, ez)
         settings.setDof(view, false, 12f, camera)
     }

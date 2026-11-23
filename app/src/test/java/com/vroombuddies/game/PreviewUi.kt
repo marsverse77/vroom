@@ -90,11 +90,11 @@ class PreviewUi {
             val hud = HudOverlay(act).apply { state = st; track = com.vroombuddies.game.ui.TrackMaps.path(com.vroombuddies.game.content.Themes.all[0].shape) }
             root.addView(hud, FrameLayout.LayoutParams(-1, -1))
             val l = SteerButton(act, -1); val r = SteerButton(act, 1)
-            root.addView(l, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 16f, b = 16f))
-            root.addView(r, Ui.lp(Ui.dpi(140f), Ui.dpi(140f), Gravity.BOTTOM or Gravity.START, l = 168f, b = 16f))
+            root.addView(l, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 16f, b = 14f))
+            root.addView(r, Ui.lp(Ui.dpi(Ui.STEER_SIZE), Ui.dpi(Ui.STEER_SIZE), Gravity.BOTTOM or Gravity.START, l = 150f, b = 14f))
             val b = BoostButton(act).apply { energy = if (shot == "race_chase") 70f else st.energy.coerceAtLeast(40f); boosting = st.boosting }
-            root.addView(b, Ui.lp(Ui.dpi(170f), Ui.dpi(170f), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
-            root.addView(Ui.roundButton(act, "⏸", Ui.PURPLE, 20f) {}, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
+            root.addView(b, Ui.lp(Ui.dpi(Ui.BOOST_SIZE), Ui.dpi(Ui.BOOST_SIZE), Gravity.BOTTOM or Gravity.END, r = 18f, b = 14f))
+            root.addView(Ui.roundButton(act, "⏸", Ui.STEEL, 24f) {}, Ui.lp(-2, -2, Gravity.TOP or Gravity.END, t = 74f, r = 22f))
             hud.tick(0.016f); if (shot != "race_start") hud.tick(2f); b.tick(0.3f)
             save(root, w, h, "hud_$shot")
         }

@@ -137,9 +137,9 @@ class PreviewExport {
             val dl = sqrt(dx * dx + dz * dz); dx /= dl; dz /= dl
             val boost = if (v.boosting) 1f else 0f
             val speedK = (v.speed / 60f).coerceIn(0f, 1.4f)
-            val dist = 9.5f + boost * 1.5f - speedK * 0.5f
-            val ey = max(p[1] + 3.6f + boost * 0.3f, track.groundHeight(v.progress) + 1f)
-            return "\"eye\":[${p[0] - dx * dist},$ey,${p[2] - dz * dist}],\"look\":[${p[0] + dx * 6f},${p[1] + 1.4f},${p[2] + dz * 6f}],\"fov\":${60f + speedK * 8f + boost * 12f}"
+            val dist = 6.8f + boost * 1.2f - speedK * 0.4f
+            val ey = max(p[1] + 2.5f + boost * 0.25f, track.groundHeight(v.progress) + 1f)
+            return "\"eye\":[${p[0] - dx * dist},$ey,${p[2] - dz * dist}],\"look\":[${p[0] + dx * 5f},${p[1] + 1.2f},${p[2] + dz * 5f}],\"fov\":${60f + speedK * 8f + boost * 12f}"
         }
 
         // 1. countdown on the grid (intro camera, swinging round the car)
@@ -199,7 +199,7 @@ class PreviewExport {
             addCar(sc, design, pt, Mat.trs(0f, 0.03f, 0f, 0f, 0.9f, 0f), 0.2f, 0f, false)
             if (k != 0) sc.write("\"carOnly\":true")
         }
-        show.write(envJson(theme) + ",\"eye\":[8.5,3.2,8.5],\"look\":[0,1,0],\"fov\":38")
+        show.write(envJson(theme) + ",\"eye\":[6.6,2.6,6.6],\"look\":[0,0.9,0],\"fov\":38")
         File(dir, "paints.txt").writeText(listOf(paints[0], paints[3]).joinToString("\n") { it.name })
     }
 }

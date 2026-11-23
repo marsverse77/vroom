@@ -135,9 +135,10 @@ class GameScene(
                 follow = 1f
             }
             CamMode.CHASE -> {
-                val dist = 9.5f + boost * 1.5f - speedK * 0.5f
-                ex = px - dx * dist; ez = pz - dz * dist; ey = py + 3.6f + boost * 0.3f
-                lx = px + dx * 6f; ly = py + 1.4f; lz = pz + dz * 6f
+                // close, low chase cam: the car fills more of the screen and speed reads stronger
+                val dist = 6.8f + boost * 1.2f - speedK * 0.4f
+                ex = px - dx * dist; ez = pz - dz * dist; ey = py + 2.5f + boost * 0.25f
+                lx = px + dx * 5f; ly = py + 1.2f; lz = pz + dz * 5f
             }
             CamMode.CINEMA -> {
                 when (cineKind) {

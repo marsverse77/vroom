@@ -80,7 +80,7 @@ class ConfettiView(ctx: Context, private val amount: Int = 160) : AnimatedView(c
     private class Bit(var x: Float, var y: Float, var vx: Float, var vy: Float, var rot: Float, var spin: Float, val color: Int, val size: Float, val round: Boolean, var flip: Float)
     private val bits = ArrayList<Bit>()
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val colors = intArrayOf(Ui.PINK, Ui.YELLOW, Ui.BLUE, Ui.GREEN, Ui.ORANGE, Ui.PURPLE, Color.WHITE)
+    private val colors = intArrayOf(Ui.ACCENT, Ui.GOLD, Color.WHITE, 0xffd0d4dc.toInt(), Ui.GOLD, Color.WHITE)
     private var started = false
     init { isClickable = false }
 
@@ -208,21 +208,25 @@ class HoldButton(ctx: Context, private val label: String, private val color: Int
     }
 }
 
-/** Slanted ribbon behind titles: ink outline, darker lip, glossy body. Leaning shapes read as "fast". */
-class BannerDrawable(private val color: Int, private val lean: Float = Ui.dp(18f)) : android.graphics.drawable.Drawable() {
+/** Title plate: a dark slanted bar with a coloured speed stripe on its leading edge. */
+class BannerDrawable(private val color: Int, private val lean: Float = Ui.dp(16f)) : android.graphics.drawable.Drawable() {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val path = Path()
     private fun para(l: Float, t: Float, r: Float, b: Float) {
         path.reset(); path.moveTo(l + lean, t); path.lineTo(r, t); path.lineTo(r - lean, b); path.lineTo(l, b); path.close()
     }
     override fun draw(c: Canvas) {
-        val b = bounds; val o = Ui.dp(3.5f); val lip = Ui.dp(5f)
-        val l = b.left.toFloat(); val t = b.top.toFloat(); val r = b.right.toFloat(); val bt = b.bottom.toFloat()
-        p.pathEffect = CornerPathEffect(Ui.dp(8f))
-        p.shader = null; p.color = Ui.INK; para(l, t, r, bt); c.drawPath(path, p)
-        p.color = Ui.darken(color, 0.38f); para(l + o, t + o, r - o, bt - o); c.drawPath(path, p)
-        p.shader = LinearGradient(0f, t, 0f, bt - lip, Ui.lighten(color, 0.22f), color, Shader.TileMode.CLAMP)
-        para(l + o, t + o, r - o, bt - o - lip); c.drawPath(path, p); p.shader = null
-        p.color = 0x44ffffff; val gh = (bt - t) * 0.3f; para(l + o + lean * 0.6f, t + o + Ui.dp(2f), r - o - lean, t + o + Ui.dp(2f) + gh); c.drawPath(path, p)
+        val b = bounds; val sh = Ui.dp(3f)
+        val l = b.left.toFloat(); val t = b.top.toFloat(); val r = b.right.toFloat(); val bt = b.bottom.toFloat() - sh
+        p.pathEffect = CornerPathEffect(Ui.dp(4f)); p.shader = null
+        p.color = 0x66000000; para(l, t + sh, r, bt + sh); c.drawPath(path, p)
+        p.shader = LinearGradient(0f, t, 0f, bt, 0xf02a2e37.toInt(), 0xf0121419.toInt(), Shader.TileMode.CLAMP)
+        para(l, t, r, bt); c.drawPath(path, p); p.shader = null
+        // speed stripe: two parallel slashes in the accent colour on the left
+        val w = Ui.dp(7f)
+        p.color = color; para(l, t, l + w + lean, bt); c.drawPath(path, p)
+        p.color = Ui.darken(color, 0.25f); para(l + w + Ui.dp(4f), t, l + w * 1.6f + Ui.dp(4f) + lean, bt); c.drawPath(path, p)
+        // top highlight
+        p.color = 0x44ffffff; p.pathEffect = null; c.drawRect(l + lean + w * 2, t, r - Ui.dp(4f), t + Ui.dp(1f), p)
     }
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
@@ -245,18 +249,19 @@ class CheckerStripView(ctx: Context, private val speed: Float = 1f) : AnimatedVi
 }
 
 /** Track picker card: theme sky gradient body with lip, ink outline and gloss. */
-class TileDrawable(private val top: Int, private val mid: Int, private val bottom: Int, private val radius: Float = Ui.dp(26f)) : android.graphics.drawable.Drawable() {
+class TileDrawable(private val top: Int, private val mid: Int, private val bottom: Int, private val radius: Float = Ui.dp(10f)) : android.graphics.drawable.Drawable() {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val r = RectF()
     override fun draw(c: Canvas) {
-        val o = Ui.dp(4f); val lip = Ui.dp(8f)
-        r.set(bounds); p.shader = null; p.color = Ui.INK; c.drawRoundRect(r, radius, radius, p)
-        r.inset(o, o); p.color = Ui.darken(bottom, 0.4f); c.drawRoundRect(r, radius - o, radius - o, p)
-        r.bottom -= lip
+        val o = Ui.dp(1.5f); val lip = Ui.dp(4f)
+        r.set(bounds); p.shader = null; p.color = 0x66000000; c.drawRoundRect(r.left, r.top + lip, r.right, r.bottom, radius, radius, p)
+        r.bottom -= lip; p.color = Ui.INK; c.drawRoundRect(r, radius, radius, p)
+        r.inset(o, o)
         p.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(top, mid, bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawRoundRect(r, radius - o, radius - o, p); p.shader = null
-        // inner white rim for a sticker look
-        p.style = Paint.Style.STROKE; p.strokeWidth = Ui.dp(3f); p.color = 0x99ffffff.toInt()
-        r.inset(Ui.dp(4f), Ui.dp(4f)); c.drawRoundRect(r, radius - o * 2, radius - o * 2, p); p.style = Paint.Style.FILL
+        // darken the lower part so the name plate and stars read, and a fine top highlight
+        p.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(0x00000000, 0x00000000, 0xcc000000.toInt()), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        c.drawRoundRect(r, radius - o, radius - o, p); p.shader = null
+        p.color = 0x55ffffff; c.drawRect(r.left + radius, r.top, r.right - radius, r.top + Ui.dp(1f), p)
     }
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
