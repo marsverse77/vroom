@@ -13,5 +13,6 @@ object ScenerySets {
         SpaceScenery.pack,
         FunTownScenery.pack,
         TropicsScenery.pack,
+        HotScenery.pack,
     )
 }
