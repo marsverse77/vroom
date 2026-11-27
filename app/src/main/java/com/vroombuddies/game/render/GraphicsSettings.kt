@@ -40,7 +40,7 @@ class GraphicsSettings(private val ctx: Context) {
         .putString("fx", effects.name).putBoolean("wind", foliageWind).putBoolean("dynres", dynamicResolution).putBoolean("fog", fog)
         .putInt("fps", targetFps).apply()
 
-    val shadowMapSize get() = when (shadows) { Level.OFF -> 0; Level.LOW -> 1024; Level.MEDIUM, Level.HIGH -> 2048 }
+    val shadowMapSize get() = when (shadows) { Level.OFF -> 0; Level.LOW -> 512; Level.MEDIUM -> 1024; Level.HIGH -> 2048 }
     val shadowCascades get() = when (shadows) { Level.HIGH -> 3; Level.MEDIUM -> 2; else -> 1 }
     val anisotropy get() = when (anisotropic) { Level.OFF -> 1f; Level.LOW -> 2f; Level.MEDIUM -> 4f; Level.HIGH -> 16f }
     val textureScale get() = when (textureQuality) { Level.OFF, Level.LOW -> 0.5f; Level.MEDIUM -> 0.75f; Level.HIGH -> 1f }

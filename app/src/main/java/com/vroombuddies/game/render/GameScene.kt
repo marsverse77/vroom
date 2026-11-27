@@ -125,7 +125,7 @@ class GameScene(
         val wantBlur = if (settings.motionBlur && racing) speedBlur * 0.6f + (if (v.boosting) 0.4f else 0f) else 0f
         post.blur = lerp(post.blur, wantBlur, 1f - exp(-realDt * 5f))
         boostGlow = lerp(boostGlow, if (v.boosting && racing) 1f else 0f, 1f - exp(-realDt * (if (v.boosting) 10f else 3f)))
-        post.boost = if (settings.effects == Level.OFF) 0f else min(1f, boostGlow + boostKick)
+        post.boost = if (settings.effects == Level.OFF || settings.effects == Level.LOW) 0f else min(1f, boostGlow + boostKick)
         // vanishing point: far ahead along the road
         if (PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
             post.focusU = proj[0].coerceIn(0.2f, 0.8f); post.focusV = proj[1].coerceIn(0.3f, 0.8f)

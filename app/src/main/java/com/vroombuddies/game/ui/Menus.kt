@@ -351,10 +351,10 @@ object Menus {
     fun applyPreset(s: GraphicsSettings, p: Preset) {
         val lvl = when (p) { Preset.SMOOTH -> Level.LOW; Preset.BALANCED -> Level.MEDIUM; else -> Level.HIGH }
         s.antiAliasing = when (p) { Preset.SMOOTH -> AaMode.FXAA; Preset.MAX -> AaMode.TAA; else -> AaMode.MSAA }
-        s.shadows = lvl; s.textureQuality = lvl; s.effects = lvl
+        s.shadows = if (p == Preset.SMOOTH) Level.OFF else lvl; s.textureQuality = lvl; s.effects = lvl
         s.ssao = when (p) { Preset.SMOOTH -> Level.OFF; Preset.BALANCED -> Level.LOW; Preset.PRETTY -> Level.MEDIUM; Preset.MAX -> Level.HIGH }
         s.anisotropic = when (p) { Preset.SMOOTH -> Level.LOW; Preset.BALANCED -> Level.MEDIUM; else -> Level.HIGH }
-        s.bloom = true
+        s.bloom = p != Preset.SMOOTH
         s.reflections = p == Preset.MAX
         s.motionBlur = p != Preset.SMOOTH
         s.godRays = p != Preset.SMOOTH

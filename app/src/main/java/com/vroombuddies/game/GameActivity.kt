@@ -62,8 +62,47 @@ class GameActivity : Activity(), MenuHost {
     private var vsyncs = 0
     private var frames = 0
     private var garageVisible = false
+    private var staticMenu = false
     private var showroomDrawn = false
     private var raceDrawn = false
+
+    private var renderScale = 1f
+    private var overspent = 0
+    private var comfortable = 0
+    private var requestedW = 0
+    private var requestedH = 0
+
+    private fun sizeRenderSurface() {
+        val w = surface.width; val h = surface.height
+        if (w <= 0 || h <= 0) return
+        val pixels = when (settings.effects) {
+            Level.OFF, Level.LOW -> 800_000f
+            Level.MEDIUM -> 1_400_000f
+            Level.HIGH -> 2_000_000f
+        }
+        val scale = minOf(1f, kotlin.math.sqrt(pixels / (w.toFloat()*h))) * renderScale
+        val rw = (w * scale).toInt().coerceAtLeast(1)
+        val rh = (h * scale).toInt().coerceAtLeast(1)
+        if (rw == requestedW && rh == requestedH) return
+        requestedW = rw; requestedH = rh
+        surface.holder.setFixedSize(rw, rh)
+    }
+
+    /** A physical-buffer fallback for drivers without reliable GPU timers. Only the 3D surface
+     * changes resolution; the controls keep their window coordinates and display resolution. */
+    private fun adaptSurface(interval: Long) {
+        if (!settings.dynamicResolution || interval <= 0) return
+        val budget = 1_000_000_000L / settings.targetFps
+        overspent = if (interval > budget * 2) overspent + 1 else 0
+        comfortable = if (interval < budget * 1.12) comfortable + 1 else 0
+        val next = when {
+            overspent >= 8 -> (renderScale * .80f).coerceAtLeast(.45f)
+            comfortable >= 240 -> (renderScale + .06f).coerceAtMost(1f)
+            else -> return
+        }
+        overspent = 0; comfortable = 0
+        if (next != renderScale) { renderScale = next; sizeRenderSurface() }
+    }
 
     private fun followRefreshRate() {
         @Suppress("DEPRECATION")
@@ -75,7 +114,11 @@ class GameActivity : Activity(), MenuHost {
     private var lastSubmission = 0L
     private var samples = 0
     private fun measureSubmission(nanos: Long) {
-        if (lastSubmission != 0L) submitIntervals[samples++] = (nanos - lastSubmission) / 1000
+        if (lastSubmission != 0L) {
+            val elapsed = nanos - lastSubmission
+            submitIntervals[samples++] = elapsed / 1000
+            adaptSurface(elapsed)
+        }
         lastSubmission = nanos
         if (samples == submitIntervals.size) {
             submitIntervals.sort()
@@ -92,6 +135,9 @@ class GameActivity : Activity(), MenuHost {
         Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         surface = SurfaceView(this)
+        surface.addOnLayoutChangeListener { _,l,t,r,b,ol,ot,orr,ob ->
+            if (::settings.isInitialized && (r-l != orr-ol || b-t != ob-ot)) sizeRenderSurface()
+        }
         overlay = FrameLayout(this)
         val root = FrameLayout(this)
         root.addView(surface, FrameLayout.LayoutParams(-1, -1))
@@ -160,6 +206,7 @@ class GameActivity : Activity(), MenuHost {
     // ------------------------------------------------------------- menus
     private fun ensureShowroom() {
         loadGeneration++
+        staticMenu = false
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
         sound.menuMusic()
         if (showroom == null) garageVisible = false
@@ -167,7 +214,7 @@ class GameActivity : Activity(), MenuHost {
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
-    override fun toTitle() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
+    override fun toTitle() { ensureShowroom(); staticMenu = true; showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
     override fun toCarPicker() {
         ensureShowroom()
         showroom!!.offsetX = 0f
@@ -207,10 +254,12 @@ class GameActivity : Activity(), MenuHost {
     }
     override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
     override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
-    override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
+    override fun toSettings() { ensureShowroom(); staticMenu = true; setScreen(Menus.settings(this, this)) }
     override fun pickCar(index: Int) { carIndex = index; paintIndex = carPaints[index]; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; carPaints[carIndex] = index; showroom?.setPaint(Paints.all[index]) }
-    override fun applySettings() { settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
+    override fun applySettings() {
+        renderScale = 1f; overspent = 0; comfortable = 0; sizeRenderSurface()
+        settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
 
     /**
      * Ask for a screen mode that matches the frame-rate setting. A 120 Hz tablet asked to run a 60 fps game
@@ -234,6 +283,7 @@ class GameActivity : Activity(), MenuHost {
     override fun stars(themeIndex: Int) = getSharedPreferences("progress", MODE_PRIVATE).getInt("stars$themeIndex", 0)
 
     override fun startRace(themeIndex: Int) {
+        staticMenu = false
         this.themeIndex = themeIndex
         setScreen(Menus.loading(this, "Building ${Themes.all[themeIndex].name}..."))
         // let the loading screen draw before the heavy build
@@ -329,9 +379,11 @@ class GameActivity : Activity(), MenuHost {
             // frame pacing: on a fast screen that couldn't switch to the game's frame rate, draw on every Nth refresh
             val interval = settings.frameInterval
             if (interval > 1 && (vsyncs++ % interval) != 0) return
+            if (!ready || (staticMenu && showroomDrawn && game == null)) return
+            val sc = swapChain ?: return
+            if (!uiHelper.isReadyToRender || !renderer.beginFrame(sc, frameTimeNanos)) return
             val dt = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceIn(0.001f, 0.05f)
             lastNanos = frameTimeNanos
-            if (!ready) return
             val g = game
             if (g != null && warmFrames > 0) {
                 g.warming = true
@@ -356,8 +408,7 @@ class GameActivity : Activity(), MenuHost {
                 }
                 hud?.tick(dt); boostBtn?.tick(dt)
             } else showroom?.update(dt)
-            val sc = swapChain ?: return
-            if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
+            run {
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 renderer.endFrame()
                 if (g != null && warmFrames == 0 && !paused) measureSubmission(frameTimeNanos) else lastSubmission = 0L
@@ -403,7 +454,9 @@ class GameActivity : Activity(), MenuHost {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
             settings.screenW = width; settings.screenH = height; settings.apply(view, renderer)
-            surfaceW = width; surfaceH = height; postFx?.resize(width, height)
+            surfaceW = width; surfaceH = height
+            if (view.renderTarget != null) view.renderTarget = null
+            postFx?.resize(width, height)
             game?.setAspect(aspect); showroom?.setAspect(aspect)
         }
     }
