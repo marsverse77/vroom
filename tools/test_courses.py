@@ -9,15 +9,21 @@ from test_launch import adb, install, running, capture, tap_label, wait_label, v
 
 def select_course(number):
     target = f"{number:02}"
-    for _ in range(50):
-        for node in visible_nodes():
-            if node["text"] == target:
-                left, top, right, bottom = node["bounds"]
-                if right-left > 16 and bottom-top > 12:
-                    adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
-                    return
-        # Deliberately slow swipes prevent flinging past the target card.
-        adb("shell", "input", "swipe", "1030", "440", "480", "440", "650")
+    for _ in range(16):
+        nodes = visible_nodes()
+        numbers = []
+        for node in nodes:
+            label = node["text"]
+            if not (len(label) == 2 and label.isdigit()):
+                continue
+            numbers.append(int(label))
+            left, top, right, bottom = node["bounds"]
+            if label == target and right-left > 16 and bottom-top > 12:
+                adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
+                return
+        if numbers:
+            tap_label("Back" if number < min(numbers) else "More")
+        time.sleep(.6)
     raise RuntimeError("Could not reach course " + target)
 
 def measure(number):

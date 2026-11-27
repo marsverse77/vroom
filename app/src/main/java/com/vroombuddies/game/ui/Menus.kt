@@ -289,7 +289,7 @@ object Menus {
         }
         root.addOnLayoutChangeListener { _, l,t,r,b,ol,ot,orr,ob ->
             if (r-l != orr-ol || b-t != ob-ot) {
-                val height = ((b-t-Ui.dp(86f))*.84f).toInt().coerceIn(Ui.dpi(120f),Ui.dpi(370f))
+                val height = ((b-t-Ui.dp(135f))*.93f).toInt().coerceIn(Ui.dpi(120f),Ui.dpi(370f))
                 for (i in 0 until strip.childCount) {
                     val tile = strip.getChildAt(i)
                     tile.layoutParams = tile.layoutParams.apply { this.height = height; width = (height*.82f).toInt() }
@@ -297,7 +297,27 @@ object Menus {
             }
         }
         scroll.addView(strip, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START))
-        root.addView(scroll, Ui.lp(-1, -1, Gravity.TOP, t = 66f, b = 8f))
+        root.addView(scroll, Ui.lp(-1, -1, Gravity.TOP, t = 60f, b = 60f))
+        val pages = Ui.row(ctx)
+        fun move(dir: Int) {
+            val card = strip.getChildAt(0) ?: return
+            val stride = card.width + Ui.dpi(8f) * 2
+            val count = ((scroll.width - scroll.paddingLeft - scroll.paddingRight) / stride.coerceAtLeast(1)).coerceAtLeast(1)
+            scroll.smoothScrollBy(dir * stride * count, 0)
+            host.click()
+        }
+        val earlier = Ui.button(ctx, "‹  Back", Ui.BLUE, 18f) { move(-1) }
+        val later = Ui.button(ctx, "More  ›", Ui.BLUE, 18f) { move(1) }
+        fun arrows() {
+            earlier.isEnabled = scroll.canScrollHorizontally(-1)
+            later.isEnabled = scroll.canScrollHorizontally(1)
+            earlier.alpha = if (earlier.isEnabled) 1f else .45f
+            later.alpha = if (later.isEnabled) 1f else .45f
+        }
+        pages.addView(earlier, lp(r = 6f)); pages.addView(later, lp(l = 6f))
+        scroll.setOnScrollChangeListener { _: View, _: Int, _: Int, _: Int, _: Int -> arrows() }
+        scroll.post { arrows() }
+        root.addView(pages, Ui.lp(-2,-2,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,b=5f))
         return root
     }
 
