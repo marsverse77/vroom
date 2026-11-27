@@ -11,6 +11,7 @@ object Prims {
     private val tmp get() = scratch.get()!!
 
     private fun put(m: MeshData, t: FloatArray?, c: Rgba, build: (MeshData) -> Unit) {
+        val tmp = this.tmp
         tmp.vCount = 0; tmp.iCount = 0
         build(tmp)
         for (i in 0 until tmp.vCount) { tmp.col[i * 4] = c.r; tmp.col[i * 4 + 1] = c.g; tmp.col[i * 4 + 2] = c.b; tmp.col[i * 4 + 3] = c.a }
@@ -35,8 +36,13 @@ object Prims {
     }
 
     /** Rounded box: a superellipsoid-ish shape made by pushing a subdivided cube toward a sphere at the corners. */
-    fun roundBox(m: MeshData, w: Float, h: Float, d: Float, r: Float, c: Rgba, t: FloatArray? = null, seg: Int = 6) = put(m, t, c) { g ->
-        val hx = w / 2 - r; val hy = h / 2 - r; val hz = d / 2 - r
+    fun roundBox(m: MeshData, w: Float, h: Float, d: Float, r: Float, c: Rgba, t: FloatArray? = null, seg: Int = 2) = put(m, t, c) { g ->
+        val radius = minOf(r, w / 2, h / 2, d / 2)
+        val hx = w / 2 - radius; val hy = h / 2 - radius; val hz = d / 2 - radius
+        fun axis(unit: Float, inner: Float) = when {
+            unit == 0f -> 0f
+            else -> sign(unit) * (inner + abs(unit) * radius)
+        }
         val n = seg * 2
         // 6 faces, each a grid; each grid point maps to cube point -> clamp to inner box + r * normalised offset
         val dirs = arrayOf(
@@ -49,12 +55,13 @@ object Prims {
                 val u = i.toFloat() / n * 2 - 1; val v = j.toFloat() / n * 2 - 1
                 // cube point (unit), then map
                 val px = f[0] + f[3] * u + f[6] * v; val py = f[1] + f[4] * u + f[7] * v; val pz = f[2] + f[5] * u + f[8] * v
-                val ix = px.coerceIn(-1f, 1f) * hx; val iy = py.coerceIn(-1f, 1f) * hy; val iz = pz.coerceIn(-1f, 1f) * hz
+                val x = axis(px,hx); val y = axis(py,hy); val z = axis(pz,hz)
+                val ix = x.coerceIn(-hx,hx); val iy = y.coerceIn(-hy,hy); val iz = z.coerceIn(-hz,hz)
                 // offset direction from inner box surface
-                var ox = px * (hx + r) - ix; var oy = py * (hy + r) - iy; var oz = pz * (hz + r) - iz
+                var ox = x - ix; var oy = y - iy; var oz = z - iz
                 val l = sqrt(ox * ox + oy * oy + oz * oz).coerceAtLeast(1e-6f)
                 ox /= l; oy /= l; oz /= l
-                g.vertex(ix + ox * r, iy + oy * r, iz + oz * r, ox, oy, oz, Rgba.WHITE, (u + 1) / 2, (v + 1) / 2)
+                g.vertex(ix + ox * radius, iy + oy * radius, iz + oz * radius, ox, oy, oz, Rgba.WHITE, (u + 1) / 2, (v + 1) / 2)
             }
             for (j in 0 until n) for (i in 0 until n) {
                 val a = base + j * (n + 1) + i

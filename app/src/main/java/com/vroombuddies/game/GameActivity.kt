@@ -46,7 +46,8 @@ class GameActivity : Activity(), MenuHost {
     private var game: GameScene? = null
     private var ready = false
     private var carIndex = 0
-    private var paintIndex = 0
+    private val carPaints = intArrayOf(0, 5, 1, 7, 4, 3, 2)
+    private var paintIndex = carPaints[0]
     private var themeIndex = 0
     private var paused = false
     private var resultShown = false
@@ -200,8 +201,8 @@ class GameActivity : Activity(), MenuHost {
     override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
     override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
     override fun toSettings() { ensureShowroom(); setScreen(Menus.settings(this, this)) }
-    override fun pickCar(index: Int) { carIndex = index; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
-    override fun pickPaint(index: Int) { paintIndex = index; showroom?.setPaint(Paints.all[index]) }
+    override fun pickCar(index: Int) { carIndex = index; paintIndex = carPaints[index]; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
+    override fun pickPaint(index: Int) { paintIndex = index; carPaints[carIndex] = index; showroom?.setPaint(Paints.all[index]) }
     override fun applySettings() { settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
 
     /**

@@ -67,9 +67,12 @@ class BoostTrails(private val engine: Engine, private val scene: Scene, material
     /** A car teleported (reset): don't draw a streak from its old place. */
     fun cut(car: Int) { for (k in 0 until perCar) started[car * perCar + k] = false }
 
+    private var visibleSegments = -1
+
     fun update(camX: Float, camY: Float, camZ: Float) {
         val pos = posBufs[ring]; val c = colBufs[ring]; ring = (ring + 1) % 3
         pos.clear(); c.clear()
+        var active = 0
         for (t in 0 until trails) {
             val o = t * n; val car = t / perCar
             val cr = col[car * 3]; val cg = col[car * 3 + 1]; val cb = col[car * 3 + 2]
@@ -77,9 +80,10 @@ class BoostTrails(private val engine: Engine, private val scene: Scene, material
                 val a = o + i; val b = a + 1
                 val ha = heat[a] * (1f - i.toFloat() / (n - 1)); val hb = heat[b] * (1f - (i + 1f) / (n - 1))
                 if (ha <= 0.001f && hb <= 0.001f) {
-                    repeat(4) { pos.put(0f).put(-1e4f).put(0f); c.put(0f).put(0f).put(0f).put(0f) }
+
                     continue
                 }
+                active++
                 // width across the segment, facing the camera
                 val dx = px[b] - px[a]; val dy = py[b] - py[a]; val dz = pz[b] - pz[a]
                 val tx = camX - px[a]; val ty = camY - py[a]; val tz = camZ - pz[a]
@@ -99,6 +103,14 @@ class BoostTrails(private val engine: Engine, private val scene: Scene, material
                 c.put(cr + wB * 2f).put(cg + wB * 2f).put(cb + wB * 2f).put(hb)
             }
         }
+        if (active != visibleSegments) {
+            val rm = engine.renderableManager
+            val instance = rm.getInstance(entity)
+            rm.setLayerMask(instance, 0xff, if (active == 0) 0 else 0xff)
+            if (active > 0) rm.setGeometryAt(instance, 0, RenderableManager.PrimitiveType.TRIANGLES, vb, ib, 0, active * 6)
+            visibleSegments = active
+        }
+        if (active == 0) return
         pos.flip(); c.flip()
         vb.setBufferAt(engine, 0, pos)
         vb.setBufferAt(engine, 1, c)
