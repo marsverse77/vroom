@@ -24,7 +24,7 @@ public final class WindowProbe extends Instrumentation {
             UiAutomation ui = getUiAutomation();
             AccessibilityNodeInfo root = null;
             for (int i = 0; i < 12 && root == null; i++) {
-                root = ui.getRootInActiveWindow(AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST);
+                root = ui.getRootInActiveWindow();
                 if (root == null) SystemClock.sleep(100);
             }
             JSONArray nodes = new JSONArray();
@@ -49,7 +49,7 @@ public final class WindowProbe extends Instrumentation {
                     .put("bounds", new JSONArray().put(rect.left).put(rect.top).put(rect.right).put(rect.bottom)));
         }
         for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo child = node.getChild(i, AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST);
             if (child != null) walk(child, nodes);
         }
     }
