@@ -273,7 +273,7 @@ object Menus {
         header(ctx, root, "Where to race?", Ui.PURPLE, host) { host.toPaintPicker() }
         val scroll = HorizontalScrollView(ctx).apply { isHorizontalScrollBarEnabled = false; clipToPadding = false; setPadding(Ui.dpi(20f), Ui.dpi(6f), Ui.dpi(20f), Ui.dpi(6f)) }
         val strip = Ui.row(ctx)
-        val cardHeight = (ctx.resources.displayMetrics.heightPixels / Ui.density - 104f).coerceIn(120f, 250f)
+        val cardHeight = ((ctx.resources.displayMetrics.heightPixels / Ui.density - 86f) * 0.82f).coerceIn(120f, 370f)
         val posters = BitmapFactory.decodeResource(ctx.resources, com.vroombuddies.game.R.drawable.festival_worlds)
         com.vroombuddies.game.content.Themes.all.forEachIndexed { i, th ->
             val tile = trackTile(ctx, th, i, host.stars(i), posters)
@@ -281,7 +281,7 @@ object Menus {
             strip.addView(tile, LinearLayout.LayoutParams(Ui.dpi(cardHeight * 0.82f), Ui.dpi(cardHeight)).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) })
             Ui.popIn(tile, 40L * i)
         }
-        scroll.addView(strip)
+        scroll.addView(strip, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START))
         root.addView(scroll, Ui.lp(-1, -1, Gravity.TOP, t = 66f, b = 8f))
         return root
     }

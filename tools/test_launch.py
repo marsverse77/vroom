@@ -17,8 +17,10 @@ def adb(*args):
 def running():
     return subprocess.run(["adb", "shell", "pidof", PACKAGE], stdout=subprocess.DEVNULL).returncode == 0
 
-adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
-adb("install", "-r", "VroomBuddies-fixed.apk")
+def install():
+    adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
+    adb("install", "-r", "VroomBuddies-fixed.apk")
+
 def wait_label(text, exact=False):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -55,84 +57,86 @@ def capture(name, label=None):
         time.sleep(1)
     raise RuntimeError("No visible game scene in " + name)
 
-for launch in ("first", "cached"):
-    adb("shell", "wm", "size", "768x1024" if launch == "first" else "800x1280")
-    adb("shell", "wm", "density", "160")
-    adb("shell", "am", "force-stop", PACKAGE)
-    adb("logcat", "-c")
-    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity")
-    try:
-        deadline = time.monotonic() + 100
-        while time.monotonic() < deadline:
-            if not running():
-                raise RuntimeError(f"{launch} launch exited")
-            if b"Showroom frame submitted" in adb("logcat", "-d", "-s", "Vroom:I"):
-                break
-            time.sleep(1)
-        else:
-            raise RuntimeError(f"{launch} launch timed out waiting for a showroom frame")
-        time.sleep(5)
-        if not running():
-            raise RuntimeError(f"{launch} launch exited after first frame")
-        capture(launch, "Play")
-        print(f"Verified {launch} launch and showroom frame")
-        tap_label("Settings", exact=True)
-        wait_label("Smooth", exact=True)
-        if launch == "first":
-            tap_label("Max", exact=True)
-            wait_label("TAA", exact=True)
-            tap_label("Smooth", exact=True)
-            tap_label("FXAA", exact=True)
-        wait_label("MSAA 4x", exact=True)
-        if launch == "cached":
-            tap_label("Smooth", exact=True)
-            wait_label("FXAA", exact=True)
-        capture("settings-" + launch)
-        tap_label("◀", exact=True)
-        if launch == "first":
-            tap_label("Play")
-            capture("tablet-4x3-garage", "ZOOMY")
-            tap_label("Next")
-            capture("tablet-4x3-paint", "PICK A COLOUR")
-            tap_label("Next")
-            capture("tablet-4x3-courses", "WHERE TO RACE")
-        if launch == "cached":
-            tap_label("Play")
-            for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
-                if index:
-                    tap_label("▶", exact=True)
-                capture("car-" + name, name.upper())
-            for screen, label in (("paint", "Next"), ("tracks", "Next"), ("grid", "01")):
-                tap_label(label)
-                if screen != "grid":
-                    capture(screen, "PICK A COLOUR" if screen == "paint" else "WHERE TO RACE")
+if __name__ == "__main__":
+    install()
+    for launch in ("first", "cached"):
+        adb("shell", "wm", "size", "768x1024" if launch == "first" else "800x1280")
+        adb("shell", "wm", "density", "160")
+        adb("shell", "am", "force-stop", PACKAGE)
+        adb("logcat", "-c")
+        adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity")
+        try:
             deadline = time.monotonic() + 100
             while time.monotonic() < deadline:
                 if not running():
-                    raise RuntimeError("Game exited while starting a race")
-                if b"Race frame submitted" in adb("logcat", "-d", "-s", "Vroom:I"):
+                    raise RuntimeError(f"{launch} launch exited")
+                if b"Showroom frame submitted" in adb("logcat", "-d", "-s", "Vroom:I"):
                     break
                 time.sleep(1)
             else:
-                raise RuntimeError("Race did not render")
+                raise RuntimeError(f"{launch} launch timed out waiting for a showroom frame")
             time.sleep(5)
             if not running():
-                raise RuntimeError("Game exited during the race")
-            capture("race")
-            deadline = time.monotonic() + 120
-            while time.monotonic() < deadline:
-                rows = re.findall(rb"Frame intervals us median=(\d+) p95=(\d+) worst=(\d+)", adb("logcat", "-d", "-s", "Vroom:I"))
-                if len(rows) >= 2:
-                    print("Software-rendered tablet, 60 submitted frames per sample:", rows, flush=True)
-                    break
+                raise RuntimeError(f"{launch} launch exited after first frame")
+            capture(launch, "Play")
+            print(f"Verified {launch} launch and showroom frame")
+            tap_label("Settings", exact=True)
+            wait_label("Smooth", exact=True)
+            if launch == "first":
+                tap_label("Max", exact=True)
+                wait_label("TAA", exact=True)
+                tap_label("Smooth", exact=True)
+                tap_label("FXAA", exact=True)
+            wait_label("MSAA 4x", exact=True)
+            if launch == "cached":
+                tap_label("Smooth", exact=True)
+                wait_label("FXAA", exact=True)
+            capture("settings-" + launch)
+            tap_label("◀", exact=True)
+            if launch == "first":
+                tap_label("Play")
+                capture("tablet-4x3-garage", "ZOOMY")
+                tap_label("Next")
+                capture("tablet-4x3-paint", "PICK A COLOUR")
+                tap_label("Next")
+                capture("tablet-4x3-courses", "WHERE TO RACE")
+            if launch == "cached":
+                tap_label("Play")
+                for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
+                    if index:
+                        tap_label("▶", exact=True)
+                    capture("car-" + name, name.upper())
+                for screen, label in (("paint", "Next"), ("tracks", "Next"), ("grid", "01")):
+                    tap_label(label)
+                    if screen != "grid":
+                        capture(screen, "PICK A COLOUR" if screen == "paint" else "WHERE TO RACE")
+                deadline = time.monotonic() + 100
+                while time.monotonic() < deadline:
+                    if not running():
+                        raise RuntimeError("Game exited while starting a race")
+                    if b"Race frame submitted" in adb("logcat", "-d", "-s", "Vroom:I"):
+                        break
+                    time.sleep(1)
+                else:
+                    raise RuntimeError("Race did not render")
+                time.sleep(5)
                 if not running():
-                    raise RuntimeError("Race exited during timing sample")
-                time.sleep(1)
-            else:
-                raise RuntimeError("Fewer than 120 measured frames")
-    finally:
-        logs = adb("logcat", "-d", "-t", "5000")
-        (OUT / f"{launch}.log").write_bytes(logs)
-        for line in logs.decode(errors="replace").splitlines():
-            if any(tag in line for tag in ("I Vroom", "F DEBUG", "Fatal signal", "AndroidRuntime")):
-                print(line)
+                    raise RuntimeError("Game exited during the race")
+                capture("race")
+                deadline = time.monotonic() + 120
+                while time.monotonic() < deadline:
+                    rows = re.findall(rb"Frame intervals us median=(\d+) p95=(\d+) worst=(\d+)", adb("logcat", "-d", "-s", "Vroom:I"))
+                    if len(rows) >= 2:
+                        print("Software-rendered tablet, 60 submitted frames per sample:", rows, flush=True)
+                        break
+                    if not running():
+                        raise RuntimeError("Race exited during timing sample")
+                    time.sleep(1)
+                else:
+                    raise RuntimeError("Fewer than 120 measured frames")
+        finally:
+            logs = adb("logcat", "-d", "-t", "5000")
+            (OUT / f"{launch}.log").write_bytes(logs)
+            for line in logs.decode(errors="replace").splitlines():
+                if any(tag in line for tag in ("I Vroom", "F DEBUG", "Fatal signal", "AndroidRuntime")):
+                    print(line)
