@@ -27,8 +27,15 @@ def install():
     adb("install", "-r", "ui-probe-debug.apk")
 
 def visible_nodes():
-    report = adb("shell", "am", "instrument", "-w",
-                 "com.vroombuddies.probe/.WindowProbe").decode(errors="replace")
+    for attempt in range(2):
+        try:
+            report = adb("shell", "am", "instrument", "-w",
+                         "com.vroombuddies.probe/.WindowProbe").decode(errors="replace")
+            break
+        except subprocess.TimeoutExpired:
+            adb("shell", "am", "force-stop", "com.vroombuddies.probe")
+            if attempt:
+                raise
     line = next((line for line in report.splitlines() if line.startswith("INSTRUMENTATION_RESULT: nodes=")), None)
     if line is None:
         raise RuntimeError("Window inspection failed: " + report[-500:])

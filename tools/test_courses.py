@@ -22,7 +22,11 @@ def select_course(number):
                 adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
                 return
         if numbers:
-            tap_label("Back" if number < min(numbers) else "More")
+            direction = "Back" if number < min(numbers) else "More"
+            button = next((node for node in nodes if direction in node["text"]), None)
+            if button:
+                left, top, right, bottom = button["bounds"]
+                adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
         time.sleep(.6)
     raise RuntimeError("Could not reach course " + target)
 
