@@ -127,10 +127,11 @@ class GameScene(
         boostGlow = lerp(boostGlow, if (v.boosting && racing) 1f else 0f, 1f - exp(-realDt * (if (v.boosting) 10f else 3f)))
         post.boost = if (settings.effects == Level.OFF || settings.effects == Level.LOW) 0f else min(1f, boostGlow + boostKick)
         // vanishing point: far ahead along the road
-        if (PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
+        if ((post.blur > 0.01f || post.boost > 0.01f) && PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
             post.focusU = proj[0].coerceIn(0.2f, 0.8f); post.focusV = proj[1].coerceIn(0.3f, 0.8f)
         }
         post.rays = if (settings.godRays) (if (theme.night) 0.4f else 1f) * (theme.sunIntensity / 3.2f).coerceIn(0.4f, 1.3f) else 0f
+        if (post.rays <= 0.01f) return
         val sd = env.sunDir
         val seen = PostFx.project(camera, (eye[0] - sd[0] * 1000f).toDouble(), (eye[1] - sd[1] * 1000f).toDouble(), (eye[2] - sd[2] * 1000f).toDouble(), proj)
         val vis = if (seen) {
@@ -227,7 +228,7 @@ class GameScene(
         val camDist = sqrt((eye[0] - px).pow(2) + (eye[1] - py).pow(2) + (eye[2] - pz).pow(2))
         settings.setDof(view, camMode == CamMode.CINEMA || camMode == CamMode.ORBIT, camDist, camera)
         hud.letterbox = lerp(hud.letterbox, if (camMode == CamMode.CINEMA) 1f else 0f, 1f - exp(-realDt * 6f))
-        updatePost(realDt, v, px, py, pz, dx, dz)
+        if (settings.usesScreenEffects) updatePost(realDt, v, px, py, pz, dx, dz)
     }
 
     // ------------------------------------------------------------------ effects

@@ -78,7 +78,11 @@ class PostFx(private val engine: Engine, material: Material?) {
         width = w; height = h
         view.viewport = Viewport(0, 0, w, h)
         releaseTarget()
-        if (mi == null || w <= 0 || h <= 0) return
+    }
+
+    private fun allocateTarget(material: MaterialInstance) {
+        val w = width
+        val h = height
         val c = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
             .format(Texture.InternalFormat.RGBA8).usage(Texture.Usage.COLOR_ATTACHMENT or Texture.Usage.SAMPLEABLE).build(engine)
         val d = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
@@ -88,7 +92,7 @@ class PostFx(private val engine: Engine, material: Material?) {
             .texture(RenderTarget.AttachmentPoint.DEPTH, d)
             .build(engine)
         color = c; depth = d
-        mi.setParameter("scene", c, sampler)
+        material.setParameter("scene", c, sampler)
     }
 
     private fun releaseTarget() {
@@ -99,12 +103,14 @@ class PostFx(private val engine: Engine, material: Material?) {
 
     /** Draw [main] to the screen, through the effects pass when [fx] wants anything. Call between beginFrame/endFrame. */
     fun render(renderer: Renderer, main: View, fx: PostFxInputs?) {
-        val m = mi; val rt = target
-        if (m == null || rt == null || fx == null || !fx.active) {
+        val m = mi
+        if (m == null || fx == null || !fx.active || width <= 0 || height <= 0) {
             if (main.renderTarget != null) main.renderTarget = null
             renderer.render(main)
             return
         }
+        if (target == null) allocateTarget(m)
+        val rt = target
         if (main.renderTarget !== rt) main.renderTarget = rt
         m.setParameter("params", fx.blur, fx.rays, fx.boost, 0f)
         m.setParameter("sun", fx.sunU, fx.sunV, fx.sunVisible, 0f)

@@ -44,6 +44,7 @@ class GraphicsSettings(private val ctx: Context) {
     val shadowCascades get() = when (shadows) { Level.HIGH -> 3; Level.MEDIUM -> 2; else -> 1 }
     val anisotropy get() = when (anisotropic) { Level.OFF -> 1f; Level.LOW -> 2f; Level.MEDIUM -> 4f; Level.HIGH -> 16f }
     val textureScale get() = when (textureQuality) { Level.OFF, Level.LOW -> 0.5f; Level.MEDIUM -> 0.75f; Level.HIGH -> 1f }
+    val usesScreenEffects get() = motionBlur || godRays || effects == Level.MEDIUM || effects == Level.HIGH
     val particleScale get() = when (effects) { Level.OFF -> 0f; Level.LOW -> 0.35f; Level.MEDIUM -> 0.7f; Level.HIGH -> 1f }
 
     /** Apply view-level options. Called when settings change and when a race starts. */

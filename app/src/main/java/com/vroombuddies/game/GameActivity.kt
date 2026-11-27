@@ -332,10 +332,13 @@ class GameActivity : Activity(), MenuHost {
             showroom?.destroy(); showroom = null
             game?.destroy()
             settings.apply(view, renderer)
-            if (postFx == null) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
+            if (!settings.usesScreenEffects) {
+                postFx?.destroy(view)
+                postFx = null
+            } else if (postFx == null && mats.postFx != null) {
+                postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
+            }
             game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound, path, layout).also { it.setAspect(aspect) }
-            // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
-            // instead of letting the collector wake up in the middle of the race
             Log.i("Vroom", "Course ready in ${android.os.SystemClock.elapsedRealtime() - start} ms")
             sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
@@ -422,7 +425,7 @@ class GameActivity : Activity(), MenuHost {
             if (g != null && warmFrames > 0) {
                 g.warming = true
                 g.update(1f / 60f, 0f, false)
-                g.post.force = true
+                g.post.force = postFx != null
                 if (settings.depthOfField) settings.setDof(view, true, 8f, camera)
                 if (--warmFrames == 0) {
                     g.warming = false; g.post.force = false
