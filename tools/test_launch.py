@@ -18,11 +18,15 @@ def running():
     return subprocess.run(["adb", "shell", "pidof", PACKAGE], stdout=subprocess.DEVNULL).returncode == 0
 
 def install():
+    adb("shell","svc","power","stayon","true")
+    adb("shell","settings","put","system","screen_off_timeout","1800000")
+    adb("shell","input","keyevent","KEYCODE_WAKEUP")
+    adb("shell","wm","dismiss-keyguard")
     adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
     adb("install", "-r", "VroomBuddies-fixed.apk")
 
 def wait_label(text, exact=False):
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + 55
     while time.monotonic() < deadline:
         result = adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
         if b"dumped" in result.lower():
@@ -59,8 +63,8 @@ def capture(name, label=None):
 
 if __name__ == "__main__":
     install()
-    for launch in ("first", "cached"):
-        adb("shell", "wm", "size", "768x1024" if launch == "first" else "800x1280")
+    for launch in ("compact", "first", "cached"):
+        adb("shell", "wm", "size", {"compact":"360x720","first":"768x1024","cached":"800x1280"}[launch])
         adb("shell", "wm", "density", "160")
         adb("shell", "am", "force-stop", PACKAGE)
         adb("logcat", "-c")
@@ -82,6 +86,18 @@ if __name__ == "__main__":
             print(f"Verified {launch} launch and showroom frame")
             tap_label("Settings", exact=True)
             wait_label("Smooth", exact=True)
+            if launch == "compact":
+                capture("compact-settings")
+                adb("shell", "wm", "size", "420x840")
+                wait_label("Smooth", exact=True)
+                tap_label("◀", exact=True)
+                tap_label("Play")
+                capture("compact-garage", "ZOOMY")
+                tap_label("Next")
+                capture("compact-paint", "PICK A COLOUR")
+                tap_label("Next")
+                capture("compact-courses", "WHERE TO RACE")
+                continue
             if launch == "first":
                 tap_label("Max", exact=True)
                 wait_label("TAA", exact=True)
@@ -135,6 +151,11 @@ if __name__ == "__main__":
                 else:
                     raise RuntimeError("Fewer than 120 measured frames")
         finally:
+            if __import__("sys").exc_info()[0] is not None:
+                print("Focused window", [x for x in adb("shell","dumpsys","window").decode(errors="replace").splitlines() if "mCurrentFocus" in x][:2])
+                print("Display state", [x for x in adb("shell","dumpsys","power").decode(errors="replace").splitlines() if "mWakefulness=" in x][:1])
+                print("Recent frame samples", adb("logcat","-d","-s","Vroom:I").decode(errors="replace")[-6000:])
+                print("Render layer stats", adb("shell","dumpsys","SurfaceFlinger","--list").decode(errors="replace")[-3000:])
             logs = adb("logcat", "-d", "-t", "5000")
             (OUT / f"{launch}.log").write_bytes(logs)
             for line in logs.decode(errors="replace").splitlines():

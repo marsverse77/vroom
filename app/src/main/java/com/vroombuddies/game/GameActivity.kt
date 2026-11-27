@@ -95,10 +95,17 @@ class GameActivity : Activity(), MenuHost {
         overlay = FrameLayout(this)
         val root = FrameLayout(this)
         root.addView(surface, FrameLayout.LayoutParams(-1, -1))
-        root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
-        overlay.setOnApplyWindowInsetsListener { v, insets ->
+        val viewport = RaceViewport(this, overlay)
+        root.addView(viewport, FrameLayout.LayoutParams(-1, -1))
+        viewport.setOnApplyWindowInsetsListener { v, insets ->
             val cut = if (android.os.Build.VERSION.SDK_INT >= 28) insets.displayCutout else null
-            v.setPadding(cut?.safeInsetLeft ?: 0, cut?.safeInsetTop ?: 0, cut?.safeInsetRight ?: 0, cut?.safeInsetBottom ?: 0)
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                v.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+            } else v.setPadding(maxOf(insets.systemWindowInsetLeft,cut?.safeInsetLeft ?: 0),
+                maxOf(insets.systemWindowInsetTop,cut?.safeInsetTop ?: 0),
+                maxOf(insets.systemWindowInsetRight,cut?.safeInsetRight ?: 0),
+                maxOf(insets.systemWindowInsetBottom,cut?.safeInsetBottom ?: 0))
             insets
         }
         setContentView(root)

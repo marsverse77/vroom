@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -72,3 +73,18 @@ jobs:
         with:
           name: tablet-courses-${{ matrix.group }}
           path: launch-check/
+
+  inspect-prior:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45927355875
+          name: launch-check
+          path: trace
+      - name: Inspect the end of the failed race
+        run: |
+          ls trace
+          tail -100 trace/cached.log | cut -c 1-320
+          rg 'Frame intervals|Course ready|Race frame|Choreographer|PowerManagerService.*(sleep|wake)|ANR in|am_anr|moved to background|ActivityTaskManager.*(STOP|PAUSE)|Fatal signal|BufferQueueProducer.*disconnect' trace/cached.log | tail -70 | cut -c 1-360
