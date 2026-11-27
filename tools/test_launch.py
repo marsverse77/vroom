@@ -1,7 +1,7 @@
 """Exercise a clean install and a cached relaunch of the actual release APK."""
 from pathlib import Path
 import re
-import xml.etree.ElementTree as ET
+import json
 from io import BytesIO
 from PIL import Image
 import subprocess
@@ -24,22 +24,28 @@ def install():
     adb("shell","wm","dismiss-keyguard")
     adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
     adb("install", "-r", "VroomBuddies-fixed.apk")
+    adb("install", "-r", "ui-probe-debug.apk")
+
+def visible_nodes():
+    report = adb("shell", "am", "instrument", "-w",
+                 "com.vroombuddies.probe/.WindowProbe").decode(errors="replace")
+    line = next((line for line in report.splitlines() if line.startswith("INSTRUMENTATION_RESULT: nodes=")), None)
+    if line is None:
+        raise RuntimeError("Window inspection failed: " + report[-500:])
+    return json.loads(line.split("=", 1)[1])
 
 def wait_label(text, exact=False):
     deadline = time.monotonic() + 55
+    nodes = []
     while time.monotonic() < deadline:
-        result = adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
-        if b"dumped" in result.lower():
-            root = ET.fromstring(adb("exec-out", "cat", "/sdcard/window.xml"))
-            if any("Opening the garage" in n.get("text","") for n in root.iter("node")):
-                time.sleep(0.5)
-                continue
-            for n in root.iter("node"):
-                if (n.get("text", "") == text if exact else text in n.get("text", "")) and n.get("package") == PACKAGE:
-                    left, top, right, bottom = map(int, re.findall(r"\d+", n.get("bounds")))
+        nodes = visible_nodes()
+        if not any("Opening the garage" in n["text"] for n in nodes):
+            for node in nodes:
+                if node["text"] == text if exact else text in node["text"]:
+                    left, top, right, bottom = node["bounds"]
                     return (left+right)//2, (top+bottom)//2
-        time.sleep(1)
-    raise RuntimeError("Could not find " + text)
+        time.sleep(.25)
+    raise RuntimeError(f"Could not find {text}. Visible labels: {[n['text'] for n in nodes]}")
 
 def tap_label(text, exact=False):
     x, y = wait_label(text, exact)

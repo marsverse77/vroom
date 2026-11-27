@@ -4,22 +4,20 @@ import json
 import re
 import sys
 import time
-import xml.etree.ElementTree as ET
-from test_launch import adb, install, running, capture, tap_label, wait_label, PACKAGE, OUT
+
+from test_launch import adb, install, running, capture, tap_label, wait_label, visible_nodes, PACKAGE, OUT
 
 def select_course(number):
     target = f"{number:02}"
-    for _ in range(22):
-        adb("shell", "uiautomator", "dump", "/sdcard/course.xml")
-        root = ET.fromstring(adb("exec-out", "cat", "/sdcard/course.xml"))
-        for node in root.iter("node"):
-            if node.get("text") == target:
-                left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
+    for _ in range(50):
+        for node in visible_nodes():
+            if node["text"] == target:
+                left, top, right, bottom = node["bounds"]
                 if right-left > 16 and bottom-top > 12:
                     adb("shell", "input", "tap", str((left+right)//2), str((top+bottom)//2))
                     return
         # Deliberately slow swipes prevent flinging past the target card.
-        adb("shell", "input", "swipe", "850", "440", "540", "440", "600")
+        adb("shell", "input", "swipe", "1030", "440", "480", "440", "650")
     raise RuntimeError("Could not reach course " + target)
 
 def measure(number):
@@ -30,7 +28,6 @@ def measure(number):
     tap_label("Next")
     tap_label("Next")
     wait_label("WHERE TO RACE")
-    start = time.monotonic()
     select_course(number)
     deadline = time.monotonic() + 180
     while time.monotonic() < deadline:
