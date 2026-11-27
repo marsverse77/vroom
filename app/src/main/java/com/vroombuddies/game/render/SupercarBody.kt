@@ -63,6 +63,20 @@ internal object SupercarBody {
             station(-0.12f, 0.91f, floor, belt * 1.22f), station(0.32f, 0.93f, floor, belt * 1.14f),
             station(0.64f, 0.99f, floor, belt * 1.18f), station(0.88f, 0.91f, floor, belt * 0.95f),
             station(1f, noseWidth, floor + 0.06f, belt * 0.79f))
+        // Each silhouette has its own deck, waist and nose section.
+        val widths = when (livery) {
+            RaceLivery.Sprint -> floatArrayOf(.91f,1.04f,1.06f,.92f,.94f,1.04f,.96f,.82f)
+            RaceLivery.Pearl -> floatArrayOf(.76f,.95f,1.08f,1.04f,1f,1.04f,.90f,.69f)
+            RaceLivery.Comet -> floatArrayOf(1.06f,1.08f,.95f,.64f,.68f,.81f,.70f,.52f)
+            RaceLivery.Summit -> floatArrayOf(1.12f,1.06f,1f,1.04f,1.04f,1.03f,1.04f,1.1f)
+            RaceLivery.Courier -> floatArrayOf(1.08f,1.04f,1f,.98f,.97f,.96f,.87f,.91f)
+            RaceLivery.Rally -> floatArrayOf(.65f,.84f,.91f,.79f,.76f,.88f,.79f,.64f)
+            RaceLivery.Honey -> floatArrayOf(1.14f,1.04f,1.05f,.94f,1f,1.03f,1.08f,1.12f)
+        }
+        for (i in body.indices) body[i][1] *= widths[i]
+        if (livery == RaceLivery.Courier || livery == RaceLivery.Summit) {
+            for (i in 0..3) body[i][3] += belt * .20f
+        }
         shell(c.paint, body, Rgba.WHITE, 0.52f)
         fun canopy(z: Float, width: Float, rise: Float) =
             station(cockpitZ + z * cockpitLength, width * cockpitWidth, belt, belt * 1.17f + rise * roofRise)
@@ -162,6 +176,32 @@ internal object SupercarBody {
                 CarKit.ellipsoid(c.paint, 0.19f, 0.18f, l * 0.31f, Rgba.WHITE,
                     Mat.trs(s * w * 0.48f, belt * 1.26f, rear * 0.76f))
         }
+        for (side in listOf(-1f, 1f)) {
+            val x = side * w
+            when (livery) {
+                RaceLivery.Sprint, RaceLivery.Pearl -> {
+                    // Sculpted shoulders frame the hood; inset LED blades sweep toward the cockpit.
+                    CarKit.ellipsoid(c.paint, w*.21f, belt*.25f, l*.40f, Rgba.WHITE,
+                        Mat.trs(x*.79f, belt*.98f, l*.52f, ry=side*.09f), 16, 8)
+                    Prims.roundBox(c.lights,.065f,.048f,l*.34f,.021f,Rgba.hex(0xadefff),
+                        Mat.trs(x*.80f,belt*1.19f,l*.66f,rx=.11f,ry=side*.24f))
+                }
+                RaceLivery.Comet -> CarKit.ellipsoid(c.paint,w*.24f,belt*.34f,l*.56f,Rgba.WHITE,
+                    Mat.trs(x*.84f,belt*.78f,-l*.17f),16,8)
+                RaceLivery.Rally -> {
+                    Prims.cylinder(c.trim,.15f,.16f,.16f,graphite,Mat.trs(x*.44f,belt*1.18f,l*.75f,rx=CarKit.HALF_PI),12)
+                    Prims.sphere(c.lights,.13f,livery.color,Mat.trs(x*.44f,belt*1.18f,l*.75f+.08f,sz=.4f),10,6)
+                }
+                RaceLivery.Summit -> Prims.roundBox(c.trim,.16f,.18f,l*1.52f,.06f,graphite,
+                    Mat.trs(x*1.03f,floor+.02f,0f))
+                RaceLivery.Honey -> Prims.roundBox(c.paint,.24f,.22f,l*.50f,.09f,Rgba.WHITE,
+                    Mat.trs(x*.28f,belt*1.19f,l*.52f,rx=.14f))
+                RaceLivery.Courier -> Prims.roundBox(c.trim,.08f,.10f,l*.60f,.035f,graphite,
+                    Mat.trs(x*.43f,crest+.045f,(cockpitZ-.13f)*l))
+            }
+        }
+        if (livery == RaceLivery.Rally || livery == RaceLivery.Summit)
+            CarKit.fenders(c, c.paint, gap=.035f, extraWidth=.015f)
         // Recessed grille, chin and rear diffuser read as a continuous dark fascia from race distance.
         Prims.roundBox(c.trim, w * noseWidth * 1.32f, 0.19f, 0.13f, 0.085f,
             graphite, Mat.trs(0f, floor + 0.19f, l * 0.99f))

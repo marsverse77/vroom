@@ -7,7 +7,8 @@ import kotlin.math.*
  * Shapes are built around the origin: boxes/spheres centred, cylinders/cones along +Y centred on their middle.
  */
 object Prims {
-    private val tmp = MeshData()
+    private val scratch = object : ThreadLocal<MeshData>() { override fun initialValue() = MeshData() }
+    private val tmp get() = scratch.get()!!
 
     private fun put(m: MeshData, t: FloatArray?, c: Rgba, build: (MeshData) -> Unit) {
         tmp.vCount = 0; tmp.iCount = 0

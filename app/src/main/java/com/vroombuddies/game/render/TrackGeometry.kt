@@ -163,6 +163,14 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
             val yaw = atan2(frame.tx, frame.tz)
             val pose = Mat.trs(x, frame.y + 0.08f, z, ry = yaw)
             Prims.torus(housing, gate.halfWidth + 0.28f, 0.24f, Rgba.hex(0x27374e), pose, 8, 32, PI.toFloat())
+            // A crown of coloured diamonds marks the charge gate from around a bend.
+            for (i in 1..5) {
+                val angle = i * PI.toFloat() / 6f
+                val lateral = cos(angle) * (gate.halfWidth + .58f)
+                val gem = Mat.trs(x + frame.rx*lateral, frame.y + sin(angle)*(gate.halfWidth+.58f),
+                    z + frame.rz*lateral, ry=yaw, rz=angle-.78f)
+                Prims.box(light, .42f, .42f, .20f, Rgba.hex(if (i%2==0) theme.kerbs.first else 0xffd459), gem)
+            }
             Prims.torus(light, gate.halfWidth, 0.10f, Rgba.hex(0xffbf4a), pose, 6, 32, PI.toFloat())
         }
         if (housing.iCount > 0) {

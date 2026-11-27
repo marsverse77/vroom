@@ -69,6 +69,19 @@ class GameActivity : Activity(), MenuHost {
         val hz = surface.display?.refreshRate ?: return
         if (kotlin.math.abs(hz - settings.displayHz) > 1f) { settings.displayHz = hz; settings.applyFrameRate(renderer) }
     }
+    private var loadGeneration = 0
+    private val submitIntervals = LongArray(60)
+    private var lastSubmission = 0L
+    private var samples = 0
+    private fun measureSubmission(nanos: Long) {
+        if (lastSubmission != 0L) submitIntervals[samples++] = (nanos - lastSubmission) / 1000
+        lastSubmission = nanos
+        if (samples == submitIntervals.size) {
+            submitIntervals.sort()
+            Log.i("Vroom", "Frame intervals us median=${submitIntervals[30]} p95=${submitIntervals[56]} worst=${submitIntervals.last()}")
+            samples = 0
+        }
+    }
     private var warmFrames = 0
     private val WARM_FRAMES = 4
     private var aspect = 1.8f
@@ -82,6 +95,11 @@ class GameActivity : Activity(), MenuHost {
         val root = FrameLayout(this)
         root.addView(surface, FrameLayout.LayoutParams(-1, -1))
         root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        overlay.setOnApplyWindowInsetsListener { v, insets ->
+            val cut = if (android.os.Build.VERSION.SDK_INT >= 28) insets.displayCutout else null
+            v.setPadding(cut?.safeInsetLeft ?: 0, cut?.safeInsetTop ?: 0, cut?.safeInsetRight ?: 0, cut?.safeInsetBottom ?: 0)
+            insets
+        }
         setContentView(root)
         hideSystemUi()
 
@@ -133,6 +151,7 @@ class GameActivity : Activity(), MenuHost {
 
     // ------------------------------------------------------------- menus
     private fun ensureShowroom() {
+        loadGeneration++
         if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
         sound.menuMusic()
         if (showroom == null) garageVisible = false
@@ -210,21 +229,30 @@ class GameActivity : Activity(), MenuHost {
         this.themeIndex = themeIndex
         setScreen(Menus.loading(this, "Building ${Themes.all[themeIndex].name}..."))
         // let the loading screen draw before the heavy build
-        overlay.postDelayed({
+        val theme = Themes.all[themeIndex]
+        val token = ++loadGeneration
+        val start = android.os.SystemClock.elapsedRealtime()
+        thread(name = "course-mesh") {
+            val path = com.vroombuddies.game.sim.TrackPath(theme.shape)
+            val layout = SceneryLayout(path, theme).place()
+            runOnUiThread {
+            if (isDestroyed || isFinishing || token != loadGeneration) return@runOnUiThread
             showroom?.destroy(); showroom = null
             game?.destroy()
             settings.apply(view, renderer)
             if (postFx == null) postFx = PostFx(engine, mats.postFx).also { it.resize(surfaceW, surfaceH) }
-            game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound).also { it.setAspect(aspect) }
+            game = GameScene(engine, scene, view, camera, mats, settings, Themes.all[themeIndex], CarDesigns.all[carIndex], Paints.all[paintIndex], sound, path, layout).also { it.setAspect(aspect) }
             // building the world leaves a lot of garbage behind: collect it now, behind the loading screen,
             // instead of letting the collector wake up in the middle of the race
-            Runtime.getRuntime().gc()
+            Log.i("Vroom", "Course ready in ${android.os.SystemClock.elapsedRealtime() - start} ms")
             sound.engineOn = true; sound.raceMusic(Themes.all[themeIndex].name)
             resultShown = false; paused = false
             // draw a few hidden frames with every effect on (still behind the loading screen) so shaders,
             // shadow maps and post-processing buffers are all ready before the countdown appears
+            samples = 0; lastSubmission = 0L
             warmFrames = WARM_FRAMES
-        }, 120)
+            }
+        }
     }
 
     private fun showHud() {
@@ -324,6 +352,7 @@ class GameActivity : Activity(), MenuHost {
             if (uiHelper.isReadyToRender && renderer.beginFrame(sc, frameTimeNanos)) {
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 renderer.endFrame()
+                if (g != null && warmFrames == 0 && !paused) measureSubmission(frameTimeNanos) else lastSubmission = 0L
                 if (g == null && !showroomDrawn) { showroomDrawn = true; Log.i("Vroom", "Showroom frame submitted") }
                 if (g != null && warmFrames == 0 && !raceDrawn) { raceDrawn = true; Log.i("Vroom", "Race frame submitted") }
             }

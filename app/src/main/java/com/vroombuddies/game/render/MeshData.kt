@@ -7,8 +7,8 @@ import kotlin.math.*
  * Everything in the game (cars, scenery, track) is generated from code into these, then uploaded once.
  */
 class MeshData {
-    var pos = FloatArray(3 * 1024); var nrm = FloatArray(3 * 1024); var col = FloatArray(4 * 1024); var uv = FloatArray(2 * 1024)
-    var idx = IntArray(3 * 1024)
+    var pos = FloatArray(3 * 32); var nrm = FloatArray(3 * 32); var col = FloatArray(4 * 32); var uv = FloatArray(2 * 32)
+    var idx = IntArray(3 * 32)
     var vCount = 0; var iCount = 0
 
     private fun growV(n: Int) {

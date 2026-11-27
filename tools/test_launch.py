@@ -56,6 +56,8 @@ def capture(name, label=None):
     raise RuntimeError("No visible game scene in " + name)
 
 for launch in ("first", "cached"):
+    adb("shell", "wm", "size", "768x1024" if launch == "first" else "800x1280")
+    adb("shell", "wm", "density", "160")
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity")
@@ -74,6 +76,19 @@ for launch in ("first", "cached"):
             raise RuntimeError(f"{launch} launch exited after first frame")
         capture(launch, "Play")
         print(f"Verified {launch} launch and showroom frame")
+        tap_label("Settings", exact=True)
+        wait_label("Smooth", exact=True)
+        if launch == "first":
+            tap_label("Max", exact=True)
+            wait_label("TAA", exact=True)
+            tap_label("Smooth", exact=True)
+            tap_label("FXAA", exact=True)
+        wait_label("MSAA 4x", exact=True)
+        if launch == "cached":
+            tap_label("Smooth", exact=True)
+            wait_label("FXAA", exact=True)
+        capture("settings-" + launch)
+        tap_label("◀", exact=True)
         if launch == "cached":
             tap_label("Play")
             for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
@@ -97,7 +112,17 @@ for launch in ("first", "cached"):
             if not running():
                 raise RuntimeError("Game exited during the race")
             capture("race")
-            print("Verified race launch")
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                rows = re.findall(rb"Frame intervals us median=(\d+) p95=(\d+) worst=(\d+)", adb("logcat", "-d", "-s", "Vroom:I"))
+                if len(rows) >= 2:
+                    print("Software-rendered tablet, 60 submitted frames per sample:", rows, flush=True)
+                    break
+                if not running():
+                    raise RuntimeError("Race exited during timing sample")
+                time.sleep(1)
+            else:
+                raise RuntimeError("Fewer than 120 measured frames")
     finally:
         logs = adb("logcat", "-d", "-t", "5000")
         (OUT / f"{launch}.log").write_bytes(logs)

@@ -47,11 +47,11 @@ object Menus {
     // ------------------------------------------------------------------ title
     private fun harborCover(ctx: Context) = android.widget.ImageView(ctx).apply {
         setImageResource(com.vroombuddies.game.R.drawable.festival_title)
-        scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     fun title(ctx: Context, host: MenuHost): View {
-        val root = Ui.frame(ctx)
+        val root = Ui.frame(ctx).apply { setBackgroundColor(Ui.INK) }
         root.addView(harborCover(ctx),FrameLayout.LayoutParams(-1,-1))
         val badge = android.widget.ImageView(ctx).apply {
             setImageResource(com.vroombuddies.game.R.drawable.wordmark)
@@ -68,9 +68,10 @@ object Menus {
         root.addView(play, Ui.lp(Ui.dpi(184f), Ui.dpi(65f), Gravity.BOTTOM or Gravity.END, r = 26f, b = 17f))
         Ui.popIn(play, 120)
         // Grown-ups hold the gear to open settings, so a tap from a small finger does nothing.
-        val gear = HoldButton(ctx, "⚙", Ui.PURPLE) { host.click(); host.toSettings() }
+        val gear = Ui.roundButton(ctx, "⚙", Ui.PURPLE, 25f) { host.click(); host.toSettings() }
         root.addView(gear, Ui.lp(Ui.dpi(54f), Ui.dpi(54f), Gravity.TOP or Gravity.END, t = 14f, r = 14f))
-        root.addView(Ui.text(ctx, "HOLD", 11f, 0xccffffff.toInt()), Ui.lp(Ui.dpi(54f), -2, Gravity.TOP or Gravity.END, t = 67f, r = 14f))
+        gear.contentDescription = "Settings"
+        root.addView(Ui.text(ctx, "Settings", 11f, 0xccffffff.toInt()).apply { setOnClickListener { gear.performClick() } }, Ui.lp(Ui.dpi(54f), -2, Gravity.TOP or Gravity.END, t = 67f, r = 14f))
         return root
     }
 
@@ -272,15 +273,16 @@ object Menus {
         header(ctx, root, "Where to race?", Ui.PURPLE, host) { host.toPaintPicker() }
         val scroll = HorizontalScrollView(ctx).apply { isHorizontalScrollBarEnabled = false; clipToPadding = false; setPadding(Ui.dpi(20f), Ui.dpi(6f), Ui.dpi(20f), Ui.dpi(6f)) }
         val strip = Ui.row(ctx)
+        val cardHeight = (ctx.resources.displayMetrics.heightPixels / Ui.density - 104f).coerceIn(120f, 250f)
         val posters = BitmapFactory.decodeResource(ctx.resources, com.vroombuddies.game.R.drawable.festival_worlds)
         com.vroombuddies.game.content.Themes.all.forEachIndexed { i, th ->
             val tile = trackTile(ctx, th, i, host.stars(i), posters)
             tile.setOnClickListener { host.click(); tile.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).withEndAction { host.startRace(i) }.start() }
-            strip.addView(tile, LinearLayout.LayoutParams(Ui.dpi(190f), Ui.dpi(232f)).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) })
+            strip.addView(tile, LinearLayout.LayoutParams(Ui.dpi(cardHeight * 0.82f), Ui.dpi(cardHeight)).apply { setMargins(Ui.dpi(8f), 0, Ui.dpi(8f), 0) })
             Ui.popIn(tile, 40L * i)
         }
         scroll.addView(strip)
-        root.addView(scroll, Ui.lp(-1, -2, Gravity.CENTER_VERTICAL, t = 52f))
+        root.addView(scroll, Ui.lp(-1, -1, Gravity.TOP, t = 66f, b = 8f))
         return root
     }
 
@@ -370,10 +372,10 @@ object Menus {
             btn = Ui.button(ctx, name(get()), colorOf(get()), 18f) {
                 host.click()
                 val n = values[(values.indexOf(get()) + 1) % values.size]; set(n)
-                btn.text = name(n); (btn.background as Ui.ChunkyDrawable).color = colorOf(n); btn.background.invalidateSelf()
+                btn.text = name(n); Ui.tintButton(btn, colorOf(n))
                 host.applySettings()
             }
-            refreshers.add { btn.text = name(get()); (btn.background as Ui.ChunkyDrawable).color = colorOf(get()); btn.background.invalidateSelf() }
+            refreshers.add { btn.text = name(get()); Ui.tintButton(btn, colorOf(get())) }
             row.addView(btn, LinearLayout.LayoutParams(Ui.dpi(150f), -2).apply { setMargins(0, Ui.dpi(4f), 0, Ui.dpi(4f)) })
             list.addView(row)
         }

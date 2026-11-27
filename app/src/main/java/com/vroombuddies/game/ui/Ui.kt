@@ -28,7 +28,8 @@ object Ui {
     var fontPlain: Typeface = Typeface.create("sans-serif", Typeface.BOLD); private set
 
     fun init(ctx: Context) {
-        density = ctx.resources.displayMetrics.density
+        val metrics = ctx.resources.displayMetrics
+        density = minOf(metrics.density, metrics.widthPixels / 605f, metrics.heightPixels / 330f)
         com.vroombuddies.game.render.Textures.loadRoadDetail(ctx.resources)
         font = try { ctx.resources.getFont(R.font.exo2_extrabold_italic) } catch (t: Throwable) { font }
         fontPlain = try { ctx.resources.getFont(R.font.exo2_bold) } catch (t: Throwable) { fontPlain }
@@ -60,7 +61,7 @@ object Ui {
 
     fun text(ctx: Context, s: String, sizeSp: Float, color: Int = Color.WHITE, outline: Boolean = true, slant: Boolean = false): TextView =
         OutlinedText(ctx, outline).apply {
-            text = s; textSize = sizeSp; typeface = if (slant) font else fontPlain; setTextColor(color); gravity = Gravity.CENTER
+            text = s; setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp(sizeSp)); typeface = if (slant) font else fontPlain; setTextColor(color); gravity = Gravity.CENTER
             includeFontPadding = false; letterSpacing = 0.02f
             if (slant) { paint.textSkewX = SLANT; setPadding(paddingLeft, paddingTop, paddingRight + (textSize * 0.12f).toInt(), paddingBottom) }
         }
@@ -99,8 +100,8 @@ object Ui {
         p.color = INK; shape(r.left, r.top, r.right, bodyBottom, radius); c.drawPath(path, p)
         shape(r.left + outline, r.top + outline, r.right - outline, bodyBottom - outline, radius)
         p.color = Color.WHITE
-        p.shader = LinearGradient(0f,r.top,0f,bodyBottom,lighten(color,if(gloss) 0.27f else 0.10f),
-            darken(color,0.06f),Shader.TileMode.CLAMP)
+        p.shader = LinearGradient(0f,r.top,0f,bodyBottom,intArrayOf(lighten(color, if (gloss) .72f else .18f), lighten(color,.23f), color, darken(color,.32f)),
+            floatArrayOf(0f,.18f,.55f,1f),Shader.TileMode.CLAMP)
         c.drawPath(path,p); p.shader = null
         if (gloss) {
             p.style = Paint.Style.STROKE; p.strokeWidth = dp(1.6f); p.color = 0x99ffffff.toInt()
@@ -138,7 +139,7 @@ object Ui {
             minWidth = dpi(48f)
             isFocusable = true
             setOnClickListener { onClick() }
-            val bg = ChunkyDrawable(color, dp(if (round) 200f else 20f), lip = dp(6f), outline = dp(2.4f))
+            val bg = ChunkyDrawable(color, dp(if (round) 200f else 20f), lip = dp(8f), outline = dp(2.8f))
             background = android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(0x44ffffff), bg, null)
             // round buttons get slim vertical padding: a TextView whose text overflows scrolls, and that
@@ -167,6 +168,13 @@ object Ui {
         }
 
     /** A round icon button (back, pause, arrows) with a fixed square size. */
+    fun tintButton(button: TextView, color: Int) {
+        val ripple = button.background as android.graphics.drawable.RippleDrawable
+        val face = ripple.getDrawable(0) as ChunkyDrawable
+        face.color = color
+        face.invalidateSelf()
+    }
+
     fun roundButton(ctx: Context, label: String, color: Int, sizeSp: Float = 26f, onClick: () -> Unit) = makeButton(ctx, label, color, sizeSp, true, onClick)
 
     fun popIn(v: View, delay: Long = 0) {

@@ -32,9 +32,8 @@ class HudState {
 class GameScene(
     private val engine: Engine, private val scene: Scene, private val view: View, private val camera: Camera,
     private val mats: MaterialLib, private val settings: GraphicsSettings, val theme: Theme,
-    design: CarDesign, paint: Paint, private val sound: SoundSink,
+    design: CarDesign, paint: Paint, private val sound: SoundSink, val track: TrackPath, sceneryLayout: SceneryLayout,
 ) {
-    val track = TrackPath(theme.shape)
     val race: Race
     private val env = Environment(engine, scene, mats, theme)
     private val trackR = TrackRenderer(engine, scene, mats, track, theme)
@@ -67,7 +66,7 @@ class GameScene(
         env.build(settings.shadowMapSize, settings.shadowCascades)
         env.applyFog(view, settings.fog)
         trackR.build()
-        scenery.build(settings.foliageWind)
+        scenery.build(settings.foliageWind, sceneryLayout)
         knock = KnockRenderer(engine, scene, mats, race.props)
         var ai = 0
         trails = BoostTrails(engine, scene, mats.particleAdd, race.racers.size)
@@ -274,7 +273,15 @@ class GameScene(
                 EventType.PAD -> {
                     add.burst(16, ev[0], ev[1] + 0.3f, ev[2], 6f, 4f, 0.5f, 0.6f, 0.1f, 0.3f, 1.6f, 3f, 1f, 0f)
                     add.ring(18, ev[0], ev[1] + 0.25f, ev[2], 14f, 0.35f, 0.5f, 0.2f, 0.4f, 1.8f, 3.5f, 1f, up = 0f, stretch = 0.05f)
-                    if (mine) boostKick = max(boostKick, 0.5f)
+                    if (mine) {
+                        boostKick = max(boostKick, 0.5f)
+                        track.frame(e.s, fr)
+                        for (side in intArrayOf(-1, 1)) {
+                            val offset = side * (pv.params.halfWidth + 1.3f)
+                            add.burst(12, ev[0] + fr.rx * offset, ev[1] + 0.4f, ev[2] + fr.rz * offset,
+                                4f, 8f, 0.58f, 0.18f, 0.04f, 0.2f, 2.8f, 3.6f, 1f, 7f, 0.04f)
+                        }
+                    }
                     if (mine) { sound.play("pad"); hud.flash = max(hud.flash, 0.35f) }
                 }
                 EventType.BOOST -> {
@@ -400,7 +407,7 @@ class GameScene(
             val kick = if (r.isPlayer) boostKick else 0f
             cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting || warming) 1f + kick * 0.8f else 0f, time, blink)
             // light trails from both rear corners (model +X maps to -right)
-            val heat = if (v.boosting && !blink) 1f else 0f
+            val heat = if (settings.effects != Level.OFF && v.boosting && !blink) 1f else 0f
             for (k in 0..1) {
                 val lx = if (k == 0) 0.6f else -0.6f; val ly = 0.55f; val lz = -1.9f
                 trails.push(i, k, tmpP[0] - rx * lx + ux * ly + fx * lz, tmpP[1] - ry * lx + uy * ly + fy * lz, tmpP[2] - rz * lx + uz * ly + fz * lz, heat)

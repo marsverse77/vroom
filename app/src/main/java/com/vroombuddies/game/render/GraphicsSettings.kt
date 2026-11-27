@@ -17,17 +17,17 @@ enum class Level(val label: String) { OFF("Off"), LOW("Low"), MEDIUM("Medium"), 
 class GraphicsSettings(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("graphics", Context.MODE_PRIVATE)
 
-    var antiAliasing = AaMode.valueOf(prefs.getString("aa", AaMode.MSAA.name)!!)
-    var shadows = Level.valueOf(prefs.getString("shadows", Level.HIGH.name)!!)
-    var ssao = Level.valueOf(prefs.getString("ssao", Level.MEDIUM.name)!!)
+    var antiAliasing = AaMode.valueOf(prefs.getString("aa", AaMode.FXAA.name)!!)
+    var shadows = Level.valueOf(prefs.getString("shadows", Level.LOW.name)!!)
+    var ssao = Level.valueOf(prefs.getString("ssao", Level.OFF.name)!!)
     var textureQuality = Level.valueOf(prefs.getString("tex", Level.HIGH.name)!!)
-    var anisotropic = Level.valueOf(prefs.getString("aniso", Level.HIGH.name)!!)
+    var anisotropic = Level.valueOf(prefs.getString("aniso", Level.MEDIUM.name)!!)
     var bloom = prefs.getBoolean("bloom", true)
     var reflections = prefs.getBoolean("ssr", false)
-    var motionBlur = prefs.getBoolean("mblur", true)
-    var godRays = prefs.getBoolean("godrays", true)
-    var depthOfField = prefs.getBoolean("dof", true)
-    var effects = Level.valueOf(prefs.getString("fx", Level.HIGH.name)!!)
+    var motionBlur = prefs.getBoolean("mblur", false)
+    var godRays = prefs.getBoolean("godrays", false)
+    var depthOfField = prefs.getBoolean("dof", false)
+    var effects = Level.valueOf(prefs.getString("fx", Level.MEDIUM.name)!!)
     var foliageWind = prefs.getBoolean("wind", true)
     var dynamicResolution = prefs.getBoolean("dynres", true)
     var fog = prefs.getBoolean("fog", true)
@@ -104,7 +104,7 @@ class GraphicsSettings(private val ctx: Context) {
             sharpness = 0.6f
         }
         applyFrameRate(renderer)
-        view.renderQuality = View.RenderQuality().apply { hdrColorBuffer = View.QualityLevel.HIGH }
+        view.renderQuality = View.RenderQuality().apply { hdrColorBuffer = if (effects == Level.HIGH) View.QualityLevel.HIGH else View.QualityLevel.MEDIUM }
         Textures.anisotropy = anisotropy
         Textures.quality = textureScale
         resetCached()
@@ -148,6 +148,6 @@ class GraphicsSettings(private val ctx: Context) {
 
     companion object {
         /** ~2560x1000 or 2000x1250: sharp on a tablet, and leaves the GPU room for every effect. */
-        const val PIXEL_BUDGET = 2_600_000f
+        const val PIXEL_BUDGET = 1_600_000f
     }
 }
