@@ -130,15 +130,36 @@ internal object SupercarBody {
                     c.trim.quad(a, b, b + steps, a + steps)
                 }
             }
-            val ex = s * w * cockpitWidth * 0.39f
-            val ez = (cockpitZ + cockpitLength * 0.62f) * l
-            val eyeW = w * cockpitWidth * 0.40f
-            val eyeD = l * cockpitLength * 0.27f
-            lens(ex, ez, eyeW, eyeD, 0.014f, Rgba.hex(0xe6eff3))
-            lens(ex - s * eyeW * 0.13f, ez + eyeD * 0.02f, eyeW * 0.39f, eyeD * 0.78f, 0.032f, Rgba.hex(0x227d9a))
-            lens(ex - s * eyeW * 0.13f, ez + eyeD * 0.03f, eyeW * 0.23f, eyeD * 0.58f, 0.045f, graphite)
-            lens(ex - eyeW * 0.17f, ez - eyeD * 0.27f, eyeW * 0.11f, eyeD * 0.16f, 0.057f, Rgba.WHITE)
+            // A broad, continuous eye panel follows the rake of the windscreen. The upper
+            // paint-coloured brow slopes inward, giving each pilot a focused expression.
+            val ex = s * w * cockpitWidth * 0.37f
+            val ez = (cockpitZ + cockpitLength * 0.58f) * l
+            val eyeW = w * cockpitWidth * 0.47f
+            val eyeD = l * cockpitLength * 0.29f
+            fun panel(u: Float, v: Float): Int {
+                val halfWidth = w * cockpitWidth * (.77f + .06f*v)
+                val x = u * halfWidth
+                val upper = .32f + .10f * (1f - abs(u))
+                val lower = .86f - .08f * abs(u).pow(3f)
+                val z = (cockpitZ + cockpitLength * (upper + (lower-upper)*v)) * l
+                return c.trim.vertex(x,top(windows,.69f,x,z)+.015f,z,0f,.8f,.6f,Rgba.hex(0xd9f4ff))
+            }
+            for (i in 0 until 8) for (j in 0 until 3) {
+                val a = s*i/8f; val b = s*(i+1)/8f
+                c.trim.quadFacing(panel(a,j/3f),panel(b,j/3f),panel(b,(j+1)/3f),panel(a,(j+1)/3f))
+            }
+            val iris = when (livery) {
+                RaceLivery.Sprint, RaceLivery.Honey -> Rgba.hex(0x39835c)
+                RaceLivery.Comet, RaceLivery.Pearl -> Rgba.hex(0x3199c3)
+                else -> Rgba.hex(0xa46b35)
+            }
+            lens(ex, ez, eyeW*.48f, eyeD*.69f, .039f, iris)
+            lens(ex, ez, eyeW*.29f, eyeD*.55f, .050f, graphite)
+            lens(ex-eyeW*.10f, ez-eyeD*.16f, eyeW*.10f, eyeD*.14f, .063f, Rgba.WHITE)
         }
+        val roofZ = (cockpitZ - cockpitLength*.15f)*l
+        CarKit.ellipsoid(c.paint,w*cockpitWidth*.88f,.07f,l*cockpitLength*.35f,Rgba.WHITE,
+            Mat.trs(0f,top(windows,.69f,0f,roofZ)-.035f,roofZ),16,6)
         val width = wheelRadius * 0.76f
         CarKit.wheels(c, wheelRadius, width, w - width * 0.43f, p.frontAxle, -p.rearAxle, livery)
         val crest = belt * 1.17f + roofRise
@@ -207,6 +228,21 @@ internal object SupercarBody {
             graphite, Mat.trs(0f, floor + 0.19f, l * 0.99f))
         Prims.roundBox(c.trim, w * 1.42f, 0.22f, 0.18f, 0.085f, graphite,
             Mat.trs(0f, floor + 0.14f, -l * 0.985f))
+        for (side in listOf(-1f,1f)) {
+            val radius = wheelRadius
+            if (livery != RaceLivery.Rally && livery != RaceLivery.Summit) {
+                CarKit.ellipsoid(c.paint,w*.25f,radius*.40f,radius*1.14f,Rgba.WHITE,
+                    Mat.trs(side*w*.82f,radius*1.75f,-p.rearAxle),18,8)
+            }
+            // The lower lip rises toward the corners to give the nose a readable smile.
+            fun lip(t: Float, edge: Float): Int {
+                val x = side*w*noseWidth*.65f*t
+                val y = floor+.145f+.07f*t*t+edge*(.045f-.022f*t)
+                return c.trim.vertex(x,y,l*0.99f+.071f,0f,0f,1f,Rgba.hex(0xc5dddf))
+            }
+            for (k in 0 until 8) c.trim.quadFacing(lip(k/8f,0f),lip((k+1)/8f,0f),
+                lip((k+1)/8f,1f),lip(k/8f,1f))
+        }
         for (i in -2..2) Prims.box(c.trim, 0.055f, 0.17f, 0.33f, graphite,
             Mat.trs(i * w * 0.23f, floor + 0.04f, -l * 0.97f))
         livery.apply(c, (belt * 1.22f + floor) / 2f)

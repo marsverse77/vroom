@@ -89,6 +89,13 @@ for launch in ("first", "cached"):
             wait_label("FXAA", exact=True)
         capture("settings-" + launch)
         tap_label("◀", exact=True)
+        if launch == "first":
+            tap_label("Play")
+            capture("tablet-4x3-garage", "ZOOMY")
+            tap_label("Next")
+            capture("tablet-4x3-paint", "PICK A COLOUR")
+            tap_label("Next")
+            capture("tablet-4x3-courses", "WHERE TO RACE")
         if launch == "cached":
             tap_label("Play")
             for index, name in enumerate(("Zoomy", "Bubbles", "Stomper", "Rocket", "Scoot", "Hopper", "Bumble")):
