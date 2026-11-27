@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -103,16 +102,3 @@ jobs:
         with:
           name: tablet-courses-${{ matrix.group }}
           path: launch-check/
-
-  prior-diagnostics:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 45929993355
-          name: tablet-courses-1
-          path: trace
-      - run: |
-          ls trace
-          grep -Ei 'outofmemory|E AndroidRuntime|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in|lowmemorykiller' trace/*.log | tail -150 | cut -c 1-420
