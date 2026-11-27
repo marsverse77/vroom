@@ -51,6 +51,21 @@ def tap_label(text, exact=False):
     x, y = wait_label(text, exact)
     adb("shell", "input", "tap", str(x), str(y))
 
+def check_play_pixels(data):
+    nodes = visible_nodes()
+    play = next(node for node in nodes if node["text"] == "Play")
+    with Image.open(BytesIO(data)) as frame:
+        w,h = frame.size
+        l,t,r,b = play["bounds"]
+        if not (0 < l < r < w and 0 < t < b < h):
+            raise RuntimeError(f"Play bounds {play['bounds']} touch the edge of {w}x{h}")
+        frame = frame.convert("RGB")
+        for x0,y0,x1,y1 in ((.78,.28,.92,.68),(.38,.68,.78,.81)):
+            area = frame.crop((int(l+(r-l)*x0),int(t+(b-t)*y0),int(l+(r-l)*x1),int(t+(b-t)*y1)))
+            green = sum(g > b*1.25 and g > r*.98 for r,g,b in area.getdata())
+            if green < area.width*area.height*.32:
+                raise RuntimeError(f"Play face is visibly cut off at {w}x{h}")
+
 def capture(name, label=None):
     if label:
         wait_label(label)
@@ -62,6 +77,8 @@ def capture(name, label=None):
             w, h = frame.size
             central = frame.crop((w//4, h//3, w*3//4, h*2//3)).convert("L").resize((40, 30))
             if sum(central.histogram()[:15]) < 0.65 * 40 * 30:
+                if label == "Play":
+                    check_play_pixels(data)
                 (OUT / (name + ".png")).write_bytes(data)
                 return
         time.sleep(1)

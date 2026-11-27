@@ -141,7 +141,11 @@ class GameActivity : Activity(), MenuHost {
         overlay = FrameLayout(this)
         val root = FrameLayout(this)
         root.addView(surface, FrameLayout.LayoutParams(-1, -1))
-        val viewport = RaceViewport(this, overlay)
+        val viewport = FrameLayout(this)
+        viewport.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        overlay.addOnLayoutChangeListener { _, l,t,r,b,ol,ot,orr,ob ->
+            if (r-l != orr-ol || b-t != ob-ot) reflow(r-l, b-t)
+        }
         root.addView(viewport, FrameLayout.LayoutParams(-1, -1))
         viewport.setOnApplyWindowInsetsListener { v, insets ->
             val cut = if (android.os.Build.VERSION.SDK_INT >= 28) insets.displayCutout else null
@@ -194,7 +198,33 @@ class GameActivity : Activity(), MenuHost {
             or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
     }
 
+    private var layoutMenu: (() -> android.view.View)? = null
+
+    private fun reflow(w: Int, h: Int) {
+        if (w <= 0 || h <= 0) return
+        val unit = minOf(resources.displayMetrics.density * 1.55f, w / 620f, h / 345f)
+        if (kotlin.math.abs(unit - Ui.density) < .001f) return
+        Ui.density = unit
+        overlay.post {
+            val menu = layoutMenu
+            if (menu != null) {
+                setScreen(menu(), swoosh = false)
+                layoutMenu = menu
+            } else if (hud != null && !resultShown) {
+                val wasPaused = paused
+                showHud()
+                if (wasPaused) { paused = false; pause() }
+            }
+        }
+    }
+
+    private fun menu(make: () -> android.view.View) {
+        setScreen(make())
+        layoutMenu = make
+    }
+
     private fun setScreen(v: android.view.View, swoosh: Boolean = true) {
+        layoutMenu = null
         overlay.removeAllViews(); overlay.addView(v, FrameLayout.LayoutParams(-1, -1)); hud = null; left = null; right = null; boostBtn = null
         if (swoosh) {
             // quick slide in from the right: every screen change feels zippy
@@ -214,13 +244,14 @@ class GameActivity : Activity(), MenuHost {
         showroom!!.setCar(CarDesigns.all[carIndex], Paints.all[paintIndex])
     }
 
-    override fun toTitle() { ensureShowroom(); staticMenu = true; showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.title(this, this)) }
+    override fun toTitle() { ensureShowroom(); staticMenu = true; showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; menu { Menus.title(this, this) } }
     override fun toCarPicker() {
         ensureShowroom()
         showroom!!.offsetX = 0f
         showroom!!.offsetY = 0.10f
         val picker = Menus.carPicker(this, this, carIndex) as FrameLayout
         setScreen(picker)
+        layoutMenu = { Menus.carPicker(this, this, carIndex) }
         if (!garageVisible) revealGarage(picker)
     }
 
@@ -252,9 +283,9 @@ class GameActivity : Activity(), MenuHost {
         }
         cover.post { poll() }
     }
-    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; setScreen(Menus.paintPicker(this, this, paintIndex)) }
-    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; setScreen(Menus.trackPicker(this, this)) }
-    override fun toSettings() { ensureShowroom(); staticMenu = true; setScreen(Menus.settings(this, this)) }
+    override fun toPaintPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0.10f; menu { Menus.paintPicker(this, this, paintIndex) } }
+    override fun toTrackPicker() { ensureShowroom(); showroom!!.offsetX = 0f; showroom!!.offsetY = 0f; menu { Menus.trackPicker(this, this) } }
+    override fun toSettings() { ensureShowroom(); staticMenu = true; menu { Menus.settings(this, this) } }
     override fun pickCar(index: Int) { carIndex = index; paintIndex = carPaints[index]; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; carPaints[carIndex] = index; showroom?.setPaint(Paints.all[index]) }
     override fun applySettings() {

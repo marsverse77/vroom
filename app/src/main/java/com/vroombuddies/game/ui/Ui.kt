@@ -194,29 +194,6 @@ object Ui {
         FrameLayout.LayoutParams(w, h, gravity).apply { setMargins(dpi(l), dpi(t), dpi(r), dpi(b)) }
 }
 
-/** Measures the overlay against the live safe window. Android maps taps through the same
- * transform, including after resizing a multi-window activity or revealing system bars. */
-class RaceViewport(ctx: Context, private val overlay: FrameLayout) : FrameLayout(ctx) {
-    init {
-        addView(overlay, LayoutParams(-1,-1,Gravity.TOP or Gravity.LEFT))
-        overlay.pivotX = 0f
-        overlay.pivotY = 0f
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val width = MeasureSpec.getSize(widthMeasureSpec)
-        val height = MeasureSpec.getSize(heightMeasureSpec)
-        val safeW = (width - paddingLeft - paddingRight).coerceAtLeast(1)
-        val safeH = (height - paddingTop - paddingBottom).coerceAtLeast(1)
-        val scale = minOf(safeW / Ui.dp(620f), safeH / Ui.dp(345f), 1.65f)
-        overlay.scaleX = scale
-        overlay.scaleY = scale
-        overlay.measure(MeasureSpec.makeMeasureSpec((safeW / scale).toInt(), MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec((safeH / scale).toInt(), MeasureSpec.EXACTLY))
-        setMeasuredDimension(width,height)
-    }
-}
-
 /**
  * Display text: a thin dark edge and a soft shadow under the colour, so it reads over any 3D background.
  */
