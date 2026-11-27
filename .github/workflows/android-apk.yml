@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -54,6 +55,13 @@ jobs:
           script: python3 tools/test_launch.py
       - name: Assemble visual review from Android captures
         run: python3 tools/showroom_review.py
+      - name: Report emulator failures
+        if: failure()
+        run: |
+          for log in launch-check/*.log; do
+            test -e "$log" || continue
+            rg -i "OutOfMemoryError|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in" "$log" | tail -60 || true
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -87,8 +95,24 @@ jobs:
           emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -no-snapshot -camera-back none
           emulator-boot-timeout: 300
           script: python3 tools/test_courses.py ${{ matrix.group }}
+      - name: Report course failures
+        if: failure()
+        run: rg -i "OutOfMemoryError|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in" launch-check/*.log | tail -90 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tablet-courses-${{ matrix.group }}
           path: launch-check/
+
+  prior-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45929993355
+          name: tablet-courses-1
+          path: trace
+      - run: |
+          ls trace
+          rg -i 'outofmemory|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in|lowmemorykiller' trace/*.log | tail -150 | cut -c 1-420
