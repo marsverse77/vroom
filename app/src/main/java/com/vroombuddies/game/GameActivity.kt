@@ -73,7 +73,8 @@ class GameActivity : Activity(), MenuHost {
     private var requestedH = 0
 
     private fun sizeRenderSurface() {
-        val w = surface.width; val h = surface.height
+        val host = surface.parent as? FrameLayout ?: return
+        val w = host.width; val h = host.height
         if (w <= 0 || h <= 0) return
         val pixels = when (settings.effects) {
             Level.OFF, Level.LOW -> 800_000f
@@ -83,9 +84,11 @@ class GameActivity : Activity(), MenuHost {
         val scale = minOf(1f, kotlin.math.sqrt(pixels / (w.toFloat()*h))) * renderScale
         val rw = (w * scale).toInt().coerceAtLeast(1)
         val rh = (h * scale).toInt().coerceAtLeast(1)
+        surface.scaleX = w.toFloat() / rw
+        surface.scaleY = h.toFloat() / rh
         if (rw == requestedW && rh == requestedH) return
         requestedW = rw; requestedH = rh
-        surface.holder.setFixedSize(rw, rh)
+        surface.layoutParams = FrameLayout.LayoutParams(rw, rh, Gravity.TOP or Gravity.LEFT)
     }
 
     /** A physical-buffer fallback for drivers without reliable GPU timers. Only the 3D surface
@@ -134,12 +137,12 @@ class GameActivity : Activity(), MenuHost {
         super.onCreate(savedInstanceState)
         Ui.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        surface = SurfaceView(this)
-        surface.addOnLayoutChangeListener { _,l,t,r,b,ol,ot,orr,ob ->
+        surface = SurfaceView(this).apply { pivotX = 0f; pivotY = 0f }
+        val root = FrameLayout(this)
+        root.addOnLayoutChangeListener { _,l,t,r,b,ol,ot,orr,ob ->
             if (::settings.isInitialized && (r-l != orr-ol || b-t != ob-ot)) sizeRenderSurface()
         }
         overlay = FrameLayout(this)
-        val root = FrameLayout(this)
         root.addView(surface, FrameLayout.LayoutParams(-1, -1))
         val viewport = FrameLayout(this)
         viewport.addView(overlay, FrameLayout.LayoutParams(-1, -1))

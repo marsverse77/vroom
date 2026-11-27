@@ -86,6 +86,12 @@ def capture(name, label=None):
             if sum(central.histogram()[:15]) < 0.65 * 40 * 30:
                 if label == "Play":
                     check_play_pixels(data)
+                if name == "race" or name.startswith("course-"):
+                    # Sample clear road/sky regions between HUD controls at both far edges.
+                    for a,b,c,d in ((.94,.35,.98,.55),(.55,.92,.72,.98)):
+                        area = frame.crop((int(w*a),int(h*b),int(w*c),int(h*d))).convert("L")
+                        if sum(area.histogram()[:3]) > area.width*area.height*.99:
+                            raise RuntimeError(f"Empty 3D viewport edge in {name} at {w}x{h}")
                 (OUT / (name + ".png")).write_bytes(data)
                 return
         time.sleep(1)
