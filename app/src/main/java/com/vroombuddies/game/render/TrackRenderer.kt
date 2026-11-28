@@ -66,6 +66,10 @@ class TrackRenderer(private val engine: Engine, private val scene: Scene, privat
         }
     }
 
+    fun includeInProfile(visible: Boolean) {
+        for (e in entities) if (visible) scene.addEntity(e) else scene.remove(e)
+    }
+
     fun destroy() {
         for (e in entities) { scene.remove(e); engine.destroyEntity(e) }
         meshes.forEach { it.destroy(engine) }

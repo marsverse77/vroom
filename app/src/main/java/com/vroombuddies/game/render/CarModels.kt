@@ -201,6 +201,10 @@ class CarInstance(private val engine: Engine, private val scene: Scene, mats: Ma
         }
     }
 
+    fun includeInProfile(visible: Boolean) {
+        for (e in ents) if (visible) scene.addEntity(e) else scene.remove(e)
+    }
+
     fun destroy() {
         for (e in ents) { scene.remove(e); engine.destroyEntity(e) }
         scene.remove(root); scene.remove(boostLight)

@@ -445,6 +445,13 @@ class GameScene(
         private val FIREWORK_COLOURS = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
     }
 
+    fun profileGroup(mode: Int) {
+        cars.forEach { it.includeInProfile(mode != 1) }
+        scenery.includeInProfile(mode != 2)
+        trackR.includeInProfile(mode != 3)
+        view.setVisibleLayers(0xff, if (mode == 4) 0 else 0xff)
+    }
+
     fun restart() {
         knock.resetAll()
     }

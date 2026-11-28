@@ -60,11 +60,20 @@ if __name__ == "__main__":
     install()
     adb("shell", "wm", "size", "800x1280")
     adb("shell", "wm", "density", "160")
-    group = int(sys.argv[1])
-    results = []
-    for course in range(group*5+1, group*5+6):
-        try:
-            results.append(measure(course))
-        finally:
-            (OUT / "timings.json").write_text(json.dumps(results, indent=2))
-            (OUT / f"course-{course:02}.log").write_bytes(adb("logcat", "-d", "-t", "5000"))
+    adb("logcat", "-c")
+    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.GameActivity")
+    tap_label("Play")
+    tap_label("Next")
+    tap_label("Next")
+    wait_label("WHERE TO RACE")
+    select_course(1)
+    deadline = time.monotonic() + 360
+    while time.monotonic() < deadline:
+        log = adb("logcat", "-d", "-s", "Vroom:I").decode(errors="replace")
+        lines = [l for l in log.splitlines() if "FIXED_GRID" in l]
+        if len(lines) == 9:
+            print("\n".join(lines))
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError(str(lines))

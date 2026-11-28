@@ -81,7 +81,7 @@ class GameActivity : Activity(), MenuHost {
             Level.MEDIUM -> 1_400_000f
             Level.HIGH -> 2_000_000f
         }
-        val scale = minOf(1f, kotlin.math.sqrt(pixels / (w.toFloat()*h))) * renderScale
+        val scale = minOf(1f, kotlin.math.sqrt(pixels / (w.toFloat()*h))) * 0.55f
         val rw = (w * scale).toInt().coerceAtLeast(1)
         val rh = (h * scale).toInt().coerceAtLeast(1)
         surface.scaleX = w.toFloat() / rw
@@ -128,7 +128,7 @@ class GameActivity : Activity(), MenuHost {
             updateTimes[samples] = update / 1000
             drawTimes[samples] = draw / 1000
             submitIntervals[samples++] = elapsed / 1000
-            adaptSurface(elapsed)
+            // Keep pixel count fixed for the entire comparison.
         }
         lastSubmission = nanos
         if (samples == submitIntervals.size) {
@@ -141,6 +141,24 @@ class GameActivity : Activity(), MenuHost {
             submitIntervals.sort()
             Log.i("Vroom", "Frame intervals us median=${submitIntervals[30]} p95=${submitIntervals[56]} worst=${submitIntervals.last()}")
             samples = 0
+        }
+    }
+    private val modes = intArrayOf(0, 1, 0, 2, 0, 3, 0, 4, 0)
+    private var window = 0
+    private var count = 0
+    private var previousTime = 0L
+    private val timings = LongArray(30)
+    private fun profileGroup(g: GameScene, time: Long) {
+        if (window >= modes.size) return
+        if (count == 0) g.profileGroup(modes[window])
+        if (count >= 10) timings[count - 10] = (time - previousTime) / 1000
+        previousTime = time
+        count++
+        if (count == 40) {
+            timings.sort()
+            Log.i("Vroom", "FIXED_GRID group=${modes[window]} us50=${timings[15]} us95=${timings[28]} pixels=${surfaceW}x$surfaceH")
+            window++
+            count = 0
         }
     }
     private var warmFrames = 0
@@ -455,7 +473,7 @@ class GameActivity : Activity(), MenuHost {
                     val steer = ((if (right?.held == true || keyRight) 1f else 0f) - (if (left?.held == true || keyLeft) 1f else 0f))
                     val boost = (boostBtn?.tapped == true) || keyBoost
                     boostBtn?.tapped = false; keyBoost = false
-                    g.update(dt, steer, boost, elapsed)
+                    profileGroup(g, frameTimeNanos)
                     hud?.state = g.hud
                     boostBtn?.energy = g.hud.energy; boostBtn?.boosting = g.hud.boosting
                     if (g.hud.phase == RacePhase.FINISHED && !resultShown) showResult(g.hud.finishPlace)

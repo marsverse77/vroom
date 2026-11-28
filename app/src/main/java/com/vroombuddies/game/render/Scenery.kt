@@ -285,6 +285,10 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
 
     private companion object { const val LOD_IN = 500f; const val LOD_OUT = 560f }
 
+    fun includeInProfile(visible: Boolean) {
+        for (e in ents) if (visible) scene.addEntity(e) else scene.remove(e)
+    }
+
     fun destroy() {
         for (e in ents) { scene.remove(e); engine.destroyEntity(e) }
         meshes.forEach { it.destroy(engine) }

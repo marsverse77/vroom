@@ -1,7 +1,7 @@
 name: Android APK
 on:
-  pull_request:
-  workflow_dispatch:
+  push:
+    branches: ["diagnostics/fixed-view-race-cost"]
 permissions:
   contents: read
 jobs:
@@ -51,54 +51,4 @@ jobs:
           target: default
           emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -no-snapshot -camera-back none
           emulator-boot-timeout: 300
-          script: python3 tools/test_launch.py
-      - name: Assemble visual review from Android captures
-        run: python3 tools/showroom_review.py
-      - name: Report emulator failures
-        if: failure()
-        run: |
-          for log in launch-check/*.log; do
-            test -e "$log" || continue
-            grep -Ei "OutOfMemoryError|E AndroidRuntime|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in" "$log" | tail -60 || true
-          done
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: launch-check
-          path: launch-check/
-
-  courses:
-    needs: build
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        group: [0, 1, 2, 3]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: layout-probe
-      - uses: actions/download-artifact@v4
-        with:
-          name: VroomBuddies-fixed
-      - run: python3 -c "from PIL import Image" || python3 -m pip install Pillow
-      - run: sudo chmod a+rw /dev/kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: default
-          emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -no-snapshot -camera-back none
-          emulator-boot-timeout: 300
-          script: python3 tools/test_courses.py ${{ matrix.group }}
-      - name: Report course failures
-        if: failure()
-        run: grep -Ei "OutOfMemoryError|E AndroidRuntime|FATAL EXCEPTION|Fatal signal|F DEBUG|Abort message|am_kill|am_crash|I Vroom|ANR in" launch-check/*.log | tail -90 || true
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: tablet-courses-${{ matrix.group }}
-          path: launch-check/
+          script: python3 tools/test_courses.py
