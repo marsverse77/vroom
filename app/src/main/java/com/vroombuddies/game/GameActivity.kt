@@ -67,6 +67,14 @@ class GameActivity : Activity(), MenuHost {
     private var raceDrawn = false
 
     private var renderScale = 1f
+    private var reducedRaceLighting = false
+
+    private fun applyRaceLighting() {
+        view.isShadowingEnabled = !reducedRaceLighting && settings.shadows != Level.OFF
+        val bloom = view.bloomOptions
+        bloom.enabled = !reducedRaceLighting && settings.bloom
+        view.bloomOptions = bloom
+    }
     private var overspent = 0
     private var comfortable = 0
     private var requestedW = 0
@@ -98,6 +106,20 @@ class GameActivity : Activity(), MenuHost {
         val budget = 1_000_000_000L / settings.targetFps
         overspent = if (interval > budget * 2) overspent + 1 else 0
         comfortable = if (interval < budget * 1.12) comfortable + 1 else 0
+        if (overspent >= 8 && renderScale <= .8f && !reducedRaceLighting &&
+            (settings.shadows != Level.OFF || settings.bloom)) {
+            reducedRaceLighting = true
+            applyRaceLighting()
+            overspent = 0
+            Log.i("Vroom", "Reduced race shadows and bloom after sustained late frames")
+            return
+        }
+        if (comfortable >= 240 && renderScale == 1f && reducedRaceLighting) {
+            reducedRaceLighting = false
+            applyRaceLighting()
+            comfortable = 0
+            return
+        }
         val next = when {
             overspent >= 8 -> (renderScale * .80f).coerceAtLeast(.45f)
             comfortable >= 240 -> (renderScale + .06f).coerceAtMost(1f)
@@ -254,7 +276,13 @@ class GameActivity : Activity(), MenuHost {
     private fun ensureShowroom() {
         loadGeneration++
         staticMenu = false
-        if (game != null) { game!!.destroy(); game = null; sound.engineOn = false }
+        if (game != null) {
+            game!!.destroy(); game = null; sound.engineOn = false
+            reducedRaceLighting = false
+            renderScale = 1f; overspent = 0; comfortable = 0
+            sizeRenderSurface()
+            applyRaceLighting()
+        }
         sound.menuMusic()
         if (showroom == null) garageVisible = false
         if (showroom == null) showroom = Showroom(engine, scene, view, camera, mats, settings, resources).also { it.setAspect(aspect) }
@@ -306,6 +334,7 @@ class GameActivity : Activity(), MenuHost {
     override fun pickCar(index: Int) { carIndex = index; paintIndex = carPaints[index]; showroom?.setCar(CarDesigns.all[index], Paints.all[paintIndex]) }
     override fun pickPaint(index: Int) { paintIndex = index; carPaints[carIndex] = index; showroom?.setPaint(Paints.all[index]) }
     override fun applySettings() {
+        reducedRaceLighting = false
         renderScale = 1f; overspent = 0; comfortable = 0; sizeRenderSurface()
         settings.save(); pickDisplayMode(); settings.apply(view, renderer) }
 
@@ -345,6 +374,8 @@ class GameActivity : Activity(), MenuHost {
             if (isDestroyed || isFinishing || token != loadGeneration) return@runOnUiThread
             showroom?.destroy(); showroom = null
             game?.destroy()
+            reducedRaceLighting = false
+            overspent = 0; comfortable = 0
             settings.apply(view, renderer)
             if (!settings.usesScreenEffects) {
                 postFx?.destroy(view)
@@ -510,6 +541,7 @@ class GameActivity : Activity(), MenuHost {
             aspect = width.toFloat() / height
             view.viewport = Viewport(0, 0, width, height)
             settings.screenW = width; settings.screenH = height; settings.apply(view, renderer)
+            if (reducedRaceLighting) applyRaceLighting()
             surfaceW = width; surfaceH = height
             if (view.renderTarget != null) view.renderTarget = null
             postFx?.resize(width, height)
