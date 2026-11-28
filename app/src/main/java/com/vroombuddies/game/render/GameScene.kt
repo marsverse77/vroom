@@ -377,7 +377,7 @@ class GameScene(
     }
 
     // ------------------------------------------------------------------ frame
-    fun update(realDt: Float, steer: Float, boost: Boolean) {
+    fun update(realDt: Float, steer: Float, boost: Boolean, raceElapsed: Float = realDt) {
         time += realDt
         race.steerInput = steer
         if (boost) race.boostPressed = true
@@ -391,7 +391,7 @@ class GameScene(
         if (camMode == CamMode.CINEMA && pv.onGround) camMode = CamMode.CHASE
         if (camMode == CamMode.INTRO && race.phase != RacePhase.COUNTDOWN) camMode = CamMode.CHASE
 
-        race.update(realDt)
+        race.update(raceElapsed)
         handleEvents()
 
         // cars

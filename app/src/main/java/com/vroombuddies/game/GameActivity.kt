@@ -382,7 +382,7 @@ class GameActivity : Activity(), MenuHost {
         paused = true; sound.setPaused(true)
         lateinit var shade: android.view.View
         shade = Menus.pause(this,
-            onResume = { click(); paused = false; sound.setPaused(false); overlay.removeView(shade) },
+            onResume = { click(); lastNanos = 0L; paused = false; sound.setPaused(false); overlay.removeView(shade) },
             onRestart = { click(); sound.setPaused(false); startRace(themeIndex) },
             onHome = { click(); paused = false; sound.setPaused(false); toTitle() })
         overlay.addView(shade, FrameLayout.LayoutParams(-1, -1))
@@ -436,7 +436,8 @@ class GameActivity : Activity(), MenuHost {
             val startBegin = System.nanoTime()
             if (!renderer.beginFrame(sc, frameTimeNanos)) { declined++; return }
             val startUpdate = System.nanoTime()
-            val dt = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceIn(0.001f, 0.05f)
+            val elapsed = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceAtLeast(0f)
+            val dt = elapsed.coerceIn(0.001f, 0.05f)
             lastNanos = frameTimeNanos
             val g = game
             if (g != null && warmFrames > 0) {
@@ -454,7 +455,7 @@ class GameActivity : Activity(), MenuHost {
                     val steer = ((if (right?.held == true || keyRight) 1f else 0f) - (if (left?.held == true || keyLeft) 1f else 0f))
                     val boost = (boostBtn?.tapped == true) || keyBoost
                     boostBtn?.tapped = false; keyBoost = false
-                    g.update(dt, steer, boost)
+                    g.update(dt, steer, boost, elapsed)
                     hud?.state = g.hud
                     boostBtn?.energy = g.hud.energy; boostBtn?.boosting = g.hud.boosting
                     if (g.hud.phase == RacePhase.FINISHED && !resultShown) showResult(g.hud.finishPlace)

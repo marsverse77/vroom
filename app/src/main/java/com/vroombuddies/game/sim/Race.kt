@@ -63,32 +63,44 @@ class Race(
 
     fun update(realDt: Float) {
         events.clear()
-        val dt = min(realDt, 1f / 20f) * timeScale
-        when (phase) {
-            RacePhase.COUNTDOWN -> { countdown -= realDt; if (countdown <= 0f) phase = RacePhase.RACING }
-            RacePhase.RACING -> raceTime += dt
-            RacePhase.FINISHED -> raceTime += dt
+        var remaining = realDt
+        if (phase == RacePhase.COUNTDOWN) {
+            val waiting = min(countdown, remaining)
+            countdown -= waiting
+            remaining -= waiting
+            if (countdown > 0f) {
+                updatePlaces()
+                return
+            }
+            phase = RacePhase.RACING
         }
-        val racing = phase != RacePhase.COUNTDOWN
+        // Respect missed frames without replaying a whole system suspension on the UI thread.
+        remaining = min(remaining, 0.5f)
+        while (remaining > 0f) {
+            val slice = min(remaining, 0.05f)
+            advance(slice * timeScale)
+            remaining -= slice
+        }
+    }
+
+    private fun advance(dt: Float) {
+        raceTime += dt
         // fixed sub-steps for stable tyre and collision maths
         val steps = max(1, ceil(dt / (1f / 240f)).toInt())
         val h = dt / steps
-        for (r in racers) driveInput(r, dt, racing)
+        for (r in racers) driveInput(r, dt)
         repeat(steps) {
             for (r in racers) {
                 val v = r.vehicle
-                if (!racing) { v.vf = 0f; v.vl = 0f; v.yawRate = 0f; continue }
                 val steer = if (r.isPlayer && !v.finished) steerInput else aiSteer(r)
                 VehiclePhysics.step(v, steer, h, track, gravity, events)
                 VehiclePhysics.collideWalls(v, track, events)
             }
             for (i in racers.indices) for (k in i + 1 until racers.size) VehiclePhysics.collideCars(racers[i].vehicle, racers[k].vehicle, track, events)
         }
-        if (racing) {
-            props.hitByCars(racers.map { it.vehicle }, events)
-            props.step(dt)
-            for (r in racers) postStep(r, dt)
-        }
+        props.hitByCars(racers.map { it.vehicle }, events)
+        props.step(dt)
+        for (r in racers) postStep(r, dt)
         updatePlaces()
     }
 
