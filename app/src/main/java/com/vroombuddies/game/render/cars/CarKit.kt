@@ -47,9 +47,9 @@ internal object CarKit {
     }
 
     /** Four identical wheels: front pair at [zf] (they steer), rear pair at [zr], centred [x] from the middle. */
-    fun wheels(c: CarParts, r: Float, w: Float, x: Float, zf: Float, zr: Float, rim: Rgba = Rgba.hex(0xd9dde3)) {
+    fun wheels(c: CarParts, r: Float, w: Float, x: Float, zf: Float, zr: Float, livery: RaceLivery) {
         c.wheelRadius = r
-        CarParts3.wheel(c.wheel, r, w, rim)
+        CarParts3.wheel(c.wheel, r, w, livery.color, livery.spokes)
         c.wheelPos.add(floatArrayOf(-x, r, zf)); c.wheelPos.add(floatArrayOf(x, r, zf))
         c.wheelPos.add(floatArrayOf(-x, r, zr)); c.wheelPos.add(floatArrayOf(x, r, zr))
     }

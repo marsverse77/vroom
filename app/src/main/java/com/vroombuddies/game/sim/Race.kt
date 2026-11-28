@@ -6,6 +6,8 @@ class Racer(val vehicle: Vehicle, val isPlayer: Boolean, val carIndex: Int, val 
     var laneTarget = 0f
     var laneTimer = 0f
     var place = 0
+    var collectedGates = 0
+    var gateLap = -1
     var aiBoostCooldown = 0f
 }
 
@@ -61,38 +63,49 @@ class Race(
 
     fun update(realDt: Float) {
         events.clear()
-        val dt = min(realDt, 1f / 20f) * timeScale
-        when (phase) {
-            RacePhase.COUNTDOWN -> { countdown -= realDt; if (countdown <= 0f) phase = RacePhase.RACING }
-            RacePhase.RACING -> raceTime += dt
-            RacePhase.FINISHED -> raceTime += dt
+        var remaining = realDt
+        if (phase == RacePhase.COUNTDOWN) {
+            val waiting = min(countdown, remaining)
+            countdown -= waiting
+            remaining -= waiting
+            if (countdown > 0f) {
+                updatePlaces()
+                return
+            }
+            phase = RacePhase.RACING
         }
-        val racing = phase != RacePhase.COUNTDOWN
+        // Respect missed frames without replaying a whole system suspension on the UI thread.
+        remaining = min(remaining, 0.5f)
+        while (remaining > 0f) {
+            val slice = min(remaining, 0.05f)
+            advance(slice * timeScale)
+            remaining -= slice
+        }
+    }
+
+    private fun advance(dt: Float) {
+        raceTime += dt
         // fixed sub-steps for stable tyre and collision maths
         val steps = max(1, ceil(dt / (1f / 240f)).toInt())
         val h = dt / steps
-        for (r in racers) driveInput(r, dt, racing)
+        for (r in racers) driveInput(r, dt)
         repeat(steps) {
             for (r in racers) {
                 val v = r.vehicle
-                if (!racing) { v.vf = 0f; v.vl = 0f; v.yawRate = 0f; continue }
                 val steer = if (r.isPlayer && !v.finished) steerInput else aiSteer(r)
                 VehiclePhysics.step(v, steer, h, track, gravity, events)
                 VehiclePhysics.collideWalls(v, track, events)
             }
             for (i in racers.indices) for (k in i + 1 until racers.size) VehiclePhysics.collideCars(racers[i].vehicle, racers[k].vehicle, track, events)
         }
-        if (racing) {
-            props.hitByCars(racers.map { it.vehicle }, events)
-            props.step(dt)
-            for (r in racers) postStep(r, dt)
-        }
+        props.hitByCars(racers.map { it.vehicle }, events)
+        props.step(dt)
+        for (r in racers) postStep(r, dt)
         updatePlaces()
     }
 
-    private fun driveInput(r: Racer, dt: Float, racing: Boolean) {
+    private fun driveInput(r: Racer, dt: Float) {
         val v = r.vehicle
-        if (!racing) return
         // boost button / AI boost
         if (r.isPlayer) {
             v.energy = min(100f, v.energy + 5f * dt)
@@ -145,6 +158,22 @@ class Race(
     private fun postStep(r: Racer, dt: Float) {
         val v = r.vehicle
         val s = track.wrap(v.progress)
+        if (r.isPlayer && phase == RacePhase.RACING && v.progress >= 0f && !v.finished) {
+            val lap = (v.progress / track.length).toInt()
+            if (lap != r.gateLap) {
+                r.collectedGates = 0
+                r.gateLap = lap
+            }
+            for ((i, gate) in track.chargeGates.withIndex()) {
+                val bit = 1 shl i
+                if ((r.collectedGates and bit) != 0 || abs(track.delta(gate.s, s)) > gate.halfLength) continue
+                if (abs(v.x - gate.x) > gate.halfWidth || !v.onGround) continue
+                r.collectedGates = r.collectedGates or bit
+                v.energy = min(100f, v.energy + 25f)
+                v.boostTimer = max(v.boostTimer, 1.8f)
+                events.add(GameEvent(EventType.BOOST, v, 2f, s, v.x, v.y))
+            }
+        }
         // boost pads
         for ((i, pad) in track.pads.withIndex()) {
             if (v.onGround && abs(track.delta(pad.s, s)) < pad.halfLength && abs(v.x - pad.x) < pad.halfWidth + 0.6f) {

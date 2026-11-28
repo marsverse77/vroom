@@ -14,7 +14,9 @@ class PostFxInputs {
     var focusU = 0.5f; var focusV = 0.55f
     val rayColor = floatArrayOf(1f, 0.9f, 0.7f)
     val boostColor = floatArrayOf(1f, 0.45f, 0.1f)
-    val active get() = blur > 0.01f || (rays > 0.01f && sunVisible > 0.01f) || boost > 0.01f
+    /** Run the pass even with nothing to show (warm-up frames build its shader and buffers ahead of time). */
+    var force = false
+    val active get() = force || blur > 0.01f || (rays > 0.01f && sunVisible > 0.01f) || boost > 0.01f
 }
 
 /**
@@ -71,22 +73,32 @@ class PostFx(private val engine: Engine, material: Material?) {
         }
     }
 
+    private var offscreenViewport = Viewport(0, 0, 1, 1)
+    private var screenViewport = Viewport(0, 0, 1, 1)
+
     fun resize(w: Int, h: Int) {
         if (w == width && h == height) return
         width = w; height = h
-        view.viewport = Viewport(0, 0, w, h)
-        releaseTarget()
-        if (mi == null || w <= 0 || h <= 0) return
+        screenViewport = Viewport(0, 0, w, h)
+        view.viewport = screenViewport
+    }
+
+    private fun allocateTarget(material: MaterialInstance) {
+        val scale = minOf(1f, kotlin.math.sqrt(320_000f / (width.toFloat() * height)))
+        val w = (width * scale).toInt().coerceAtLeast(1)
+        val h = (height * scale).toInt().coerceAtLeast(1)
         val c = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
             .format(Texture.InternalFormat.RGBA8).usage(Texture.Usage.COLOR_ATTACHMENT or Texture.Usage.SAMPLEABLE).build(engine)
         val d = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
             .format(Texture.InternalFormat.DEPTH24).usage(Texture.Usage.DEPTH_ATTACHMENT).build(engine)
-        target = RenderTarget.Builder()
+        val next = RenderTarget.Builder()
             .texture(RenderTarget.AttachmentPoint.COLOR, c)
             .texture(RenderTarget.AttachmentPoint.DEPTH, d)
             .build(engine)
+        material.setParameter("scene", c, sampler)
+        target = next
         color = c; depth = d
-        mi.setParameter("scene", c, sampler)
+        offscreenViewport = Viewport(0, 0, w, h)
     }
 
     private fun releaseTarget() {
@@ -97,19 +109,23 @@ class PostFx(private val engine: Engine, material: Material?) {
 
     /** Draw [main] to the screen, through the effects pass when [fx] wants anything. Call between beginFrame/endFrame. */
     fun render(renderer: Renderer, main: View, fx: PostFxInputs?) {
-        val m = mi; val rt = target
-        if (m == null || rt == null || fx == null || !fx.active) {
+        val m = mi
+        if (m == null || fx == null || !fx.active || width <= 0 || height <= 0) {
             if (main.renderTarget != null) main.renderTarget = null
             renderer.render(main)
             return
         }
+        if (target == null) allocateTarget(m)
+        val rt = target
         if (main.renderTarget !== rt) main.renderTarget = rt
         m.setParameter("params", fx.blur, fx.rays, fx.boost, 0f)
         m.setParameter("sun", fx.sunU, fx.sunV, fx.sunVisible, 0f)
         m.setParameter("focus", fx.focusU, fx.focusV)
         m.setParameter("rayColor", fx.rayColor[0], fx.rayColor[1], fx.rayColor[2], 1f)
         m.setParameter("boostColor", fx.boostColor[0], fx.boostColor[1], fx.boostColor[2], 1f)
+        main.viewport = offscreenViewport
         renderer.render(main)
+        main.viewport = screenViewport
         renderer.render(view)
     }
 

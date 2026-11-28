@@ -43,10 +43,6 @@ class TropicsFx private constructor(
     private val alpha: Particles? = if (theme.name == "Bubble Reef" || theme.name == "Jungle Jam") Particles(engine, scene, mats.particleAlpha, 320) else null
     private val mtx = FloatArray(16)
 
-    init {
-        add?.scale = particleScale; alpha?.scale = particleScale
-        if (theme.water != null) buildSea(theme.water)
-    }
 
     private fun litMi(rough: Float): MaterialInstance = mats.lit.createInstance().also {
         it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", rough); it.setParameter("metallic", 0f)
@@ -68,6 +64,11 @@ class TropicsFx private constructor(
     private val shoreBins = 96
     private val shore = FloatArray(shoreBins)
     private var cx = 0f; private var cz = 0f
+
+    init {
+        add?.scale = particleScale; alpha?.scale = particleScale
+        if (theme.water != null) buildSea(theme.water)
+    }
 
     private fun shoreAt(a: Float): Float {
         val u = ((a / (2 * PI.toFloat())) % 1f + 1f) % 1f * shoreBins

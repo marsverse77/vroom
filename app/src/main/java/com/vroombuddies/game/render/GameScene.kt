@@ -32,9 +32,8 @@ class HudState {
 class GameScene(
     private val engine: Engine, private val scene: Scene, private val view: View, private val camera: Camera,
     private val mats: MaterialLib, private val settings: GraphicsSettings, val theme: Theme,
-    design: CarDesign, paint: Paint, private val sound: SoundSink,
+    design: CarDesign, paint: Paint, private val sound: SoundSink, val track: TrackPath, sceneryLayout: SceneryLayout,
 ) {
-    val track = TrackPath(theme.shape)
     val race: Race
     private val env = Environment(engine, scene, mats, theme)
     private val trackR = TrackRenderer(engine, scene, mats, track, theme)
@@ -55,6 +54,8 @@ class GameScene(
     val hud = HudState()
     private val rnd = Random(9)
     private var time = 0f
+    /** Warm-up frames behind the loading screen: show boost flames and a few particles so their shaders get built. */
+    var warming = false
 
     init {
         val aiPaints = Paints.all.filter { it.color != paint.color && !it.rainbow }.shuffled(Random(theme.shape.seed))
@@ -65,7 +66,7 @@ class GameScene(
         env.build(settings.shadowMapSize, settings.shadowCascades)
         env.applyFog(view, settings.fog)
         trackR.build()
-        scenery.build(settings.foliageWind)
+        scenery.build(settings.foliageWind, sceneryLayout)
         knock = KnockRenderer(engine, scene, mats, race.props)
         var ai = 0
         trails = BoostTrails(engine, scene, mats.particleAdd, race.racers.size)
@@ -124,12 +125,13 @@ class GameScene(
         val wantBlur = if (settings.motionBlur && racing) speedBlur * 0.6f + (if (v.boosting) 0.4f else 0f) else 0f
         post.blur = lerp(post.blur, wantBlur, 1f - exp(-realDt * 5f))
         boostGlow = lerp(boostGlow, if (v.boosting && racing) 1f else 0f, 1f - exp(-realDt * (if (v.boosting) 10f else 3f)))
-        post.boost = if (settings.effects == Level.OFF) 0f else min(1f, boostGlow + boostKick)
+        post.boost = if (settings.effects == Level.OFF || settings.effects == Level.LOW) 0f else min(1f, boostGlow + boostKick)
         // vanishing point: far ahead along the road
-        if (PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
+        if ((post.blur > 0.01f || post.boost > 0.01f) && PostFx.project(camera, (px + dx * 200f).toDouble(), (py + 2f).toDouble(), (pz + dz * 200f).toDouble(), proj)) {
             post.focusU = proj[0].coerceIn(0.2f, 0.8f); post.focusV = proj[1].coerceIn(0.3f, 0.8f)
         }
         post.rays = if (settings.godRays) (if (theme.night) 0.4f else 1f) * (theme.sunIntensity / 3.2f).coerceIn(0.4f, 1.3f) else 0f
+        if (post.rays <= 0.01f) return
         val sd = env.sunDir
         val seen = PostFx.project(camera, (eye[0] - sd[0] * 1000f).toDouble(), (eye[1] - sd[1] * 1000f).toDouble(), (eye[2] - sd[2] * 1000f).toDouble(), proj)
         val vis = if (seen) {
@@ -172,17 +174,21 @@ class GameScene(
         when (camMode) {
             CamMode.INTRO -> {
                 val t = (1f - race.countdown / 3.6f).coerceIn(0f, 1f)
-                val a = (1f - t) * 2.6f
-                val r = lerp(16f, 10f, t)
+                val ease = t * t * (3f - 2f * t)
+                val a = (1f - ease) * 2.8f
+                val r = lerp(5.8f, 6.8f, ease) + 2.4f * sin(PI.toFloat() * ease)
                 ex = px + (dx * cos(a) - fr.rx * sin(a)) * -r; ez = pz + (dz * cos(a) - fr.rz * sin(a)) * -r
-                ey = py + lerp(7f, 4f, t)
+                ey = py + lerp(1.45f, 2.5f, ease) + 1.8f * sin(PI.toFloat() * ease)
+                wantFov = lerp(42f, 60f, ease)
                 lx = px; ly = py + 1.2f; lz = pz
                 follow = 1f
             }
             CamMode.CHASE -> {
                 // close, low chase cam: the car fills more of the screen and speed reads stronger
-                val dist = 6.8f + boost * 1.2f - speedK * 0.4f
-                ex = px - dx * dist; ez = pz - dz * dist; ey = py + 2.5f + boost * 0.25f
+                val kick = if (settings.effects == Level.OFF) 0f else boostKick
+                val dist = 6.8f + boost * 1.2f - speedK * 0.4f + kick * 0.70f
+                wantFov += kick * 4f
+                ex = px - dx * dist; ez = pz - dz * dist; ey = py + 2.5f - boost * 0.22f
                 lx = px + dx * 5f; ly = py + 1.2f; lz = pz + dz * 5f
             }
             CamMode.CINEMA -> {
@@ -209,7 +215,9 @@ class GameScene(
         shake = max(0f, shake - realDt * 2.5f)
         val sk = shake * shake * 0.5f
         val sx = (rnd.nextFloat() - 0.5f) * sk; val sy = (rnd.nextFloat() - 0.5f) * sk
-        camera.setProjection(fov.toDouble(), aspect.toDouble(), 0.3, 6000.0, Camera.Fov.VERTICAL)
+        // near/far kept as tight as the scene allows (sky dome is at 2.6 km): far more depth precision,
+        // so road markings, boost pads and the start line never flicker against the road far away
+        camera.setProjection(fov.toDouble(), aspect.toDouble(), NEAR, FAR, Camera.Fov.VERTICAL)
         // up vector tilted by the cinematic roll (dutch angle)
         var vfx = look[0] - eye[0]; var vfz = look[2] - eye[2]
         val vl = sqrt(vfx * vfx + vfz * vfz).coerceAtLeast(1e-4f); vfx /= vl; vfz /= vl
@@ -220,11 +228,7 @@ class GameScene(
         val camDist = sqrt((eye[0] - px).pow(2) + (eye[1] - py).pow(2) + (eye[2] - pz).pow(2))
         settings.setDof(view, camMode == CamMode.CINEMA || camMode == CamMode.ORBIT, camDist, camera)
         hud.letterbox = lerp(hud.letterbox, if (camMode == CamMode.CINEMA) 1f else 0f, 1f - exp(-realDt * 6f))
-        updatePost(realDt, v, px, py, pz, dx, dz)
-        view.vignetteOptions = View.VignetteOptions().apply {
-            enabled = true; midPoint = 0.45f - 0.15f * boost; roundness = 0.6f; feather = 0.6f
-            color = if (boost > 0f) floatArrayOf(0.3f, 0.05f, 0f, 1f) else floatArrayOf(0f, 0f, 0f, 1f)
-        }
+        if (settings.usesScreenEffects) updatePost(realDt, v, px, py, pz, dx, dz)
     }
 
     // ------------------------------------------------------------------ effects
@@ -233,7 +237,8 @@ class GameScene(
 
     private fun handleEvents() {
         val pv = race.playerVehicle
-        for (e in race.events) {
+        for (ei in race.events.indices) {
+            val e = race.events[ei]
             val mine = e.car === pv
             worldOf(e.s, e.x, e.y, ev)
             when (e.type) {
@@ -269,12 +274,23 @@ class GameScene(
                 EventType.PAD -> {
                     add.burst(16, ev[0], ev[1] + 0.3f, ev[2], 6f, 4f, 0.5f, 0.6f, 0.1f, 0.3f, 1.6f, 3f, 1f, 0f)
                     add.ring(18, ev[0], ev[1] + 0.25f, ev[2], 14f, 0.35f, 0.5f, 0.2f, 0.4f, 1.8f, 3.5f, 1f, up = 0f, stretch = 0.05f)
-                    if (mine) boostKick = max(boostKick, 0.5f)
+                    if (mine) {
+                        boostKick = max(boostKick, 0.5f)
+                        track.frame(e.s, fr)
+                        for (side in intArrayOf(-1, 1)) {
+                            val offset = side * (pv.params.halfWidth + 1.3f)
+                            add.burst(12, ev[0] + fr.rx * offset, ev[1] + 0.4f, ev[2] + fr.rz * offset,
+                                4f, 8f, 0.58f, 0.18f, 0.04f, 0.2f, 2.8f, 3.6f, 1f, 7f, 0.04f)
+                        }
+                    }
                     if (mine) { sound.play("pad"); hud.flash = max(hud.flash, 0.35f) }
                 }
                 EventType.BOOST -> {
                     // shockwave: a ring of hot sparks plus a bright flash of the car's boost light
                     add.ring(if (mine) 36 else 16, ev[0], ev[1] + 0.5f, ev[2], 16f, 0.4f, 0.7f, 0.15f, 3.5f, 2f, 0.6f, 1f, up = 1f, stretch = 0.04f)
+                    if (mine && e.strength >= 2f) {
+                        add.ring(32, ev[0], ev[1] + 0.85f, ev[2], 11f, 0.55f, 0.7f, 0.14f, 0.45f, 2.3f, 2.6f, 1f, up = 3f, stretch = 0.04f)
+                    }
                     if (mine) { sound.play("boost"); hud.flash = 0.6f; shake = max(shake, 0.3f); boostKick = 1f }
                 }
                 EventType.RESET -> {
@@ -296,6 +312,8 @@ class GameScene(
     private var fireworkTimer = 0f
     private fun celebrate(win: Boolean) { confettiTimer = if (win) 7f else 3f; fireworkTimer = if (win) 7f else 0f }
 
+    private var exhaustCredit = 0f
+
     private fun ambientFx(dt: Float) {
         val v = race.playerVehicle
         carPose(v, tmpP, tmpF)
@@ -303,14 +321,22 @@ class GameScene(
         val boostOn = v.boosting
         HotFx.update(theme, dt, eye, look, add, alpha, rnd)
         // boost: hot sparks from the exhausts + glowing trail
-        if (boostOn) repeat(3) {
-            add.spawn(tmpP[0] - tmpF[0] * 2.4f, tmpP[1] + 0.5f, tmpP[2] - tmpF[2] * 2.4f,
-                -tmpF[0] * 12f + (rnd.nextFloat() - 0.5f) * 3f, rnd.nextFloat() * 2f, -tmpF[2] * 12f + (rnd.nextFloat() - 0.5f) * 3f,
-                0.35f, 0.5f, 0.1f, 4f, 1.6f, 0.4f, 1f, 0f, 2f, 0.03f)
-        }
+        if (boostOn) {
+            exhaustCredit += dt * 42f
+            while (exhaustCredit >= 1f) {
+                exhaustCredit -= 1f
+                for (side in -1..1 step 2) {
+                    val width = v.params.halfWidth * 0.51f * side
+                    val x = tmpP[0] - tmpF[0] * v.params.halfLength + tmpF[2] * width
+                    val z = tmpP[2] - tmpF[2] * v.params.halfLength - tmpF[0] * width
+                    add.spawn(x, tmpP[1] + 0.47f, z, -tmpF[0] * 18f, 0.3f, -tmpF[2] * 18f,
+                        0.24f, 0.22f, 0.045f, 0.55f, 2.6f, 3.6f, 0.95f, 0f, 1f, 0.08f)
+                }
+            }
+        } else exhaustCredit = 0f
         // tyre smoke when sliding
-        for (r in race.racers) {
-            val c = r.vehicle
+        for (ri in race.racers.indices) {
+            val c = race.racers[ri].vehicle
             if (c.onGround && abs(c.vl) > 4.5f && rnd.nextFloat() < 0.6f) {
                 carPose(c, tmpP, tmpF)
                 alpha.spawn(tmpP[0] - tmpF[0] * 1.5f, tmpP[1] + 0.3f, tmpP[2] - tmpF[2] * 1.5f, 0f, 1f, 0f, 1.2f, 1f, 3.5f, 0.85f, 0.85f, 0.85f, 0.45f, -0.4f, 1f)
@@ -342,8 +368,7 @@ class GameScene(
             fireworkTimer -= dt
             if (rnd.nextFloat() < dt * 2.2f) {
                 carPose(v, tmpP, tmpF)
-                val cols = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
-                val c = cols[rnd.nextInt(cols.size)]
+                val c = FIREWORK_COLOURS[rnd.nextInt(FIREWORK_COLOURS.size)]
                 add.burst(70, tmpP[0] + (rnd.nextFloat() - 0.5f) * 30f, tmpP[1] + 18f + rnd.nextFloat() * 10f, tmpP[2] + (rnd.nextFloat() - 0.5f) * 30f,
                     14f, 0f, 1.4f, 0.5f, 0.1f, c[0], c[1], c[2], 1f, 4f, 0.03f)
                 sound.play("firework")
@@ -352,7 +377,7 @@ class GameScene(
     }
 
     // ------------------------------------------------------------------ frame
-    fun update(realDt: Float, steer: Float, boost: Boolean) {
+    fun update(realDt: Float, steer: Float, boost: Boolean, raceElapsed: Float = realDt) {
         time += realDt
         race.steerInput = steer
         if (boost) race.boostPressed = true
@@ -366,11 +391,12 @@ class GameScene(
         if (camMode == CamMode.CINEMA && pv.onGround) camMode = CamMode.CHASE
         if (camMode == CamMode.INTRO && race.phase != RacePhase.COUNTDOWN) camMode = CamMode.CHASE
 
-        race.update(realDt)
+        race.update(raceElapsed)
         handleEvents()
 
         // cars
-        for ((i, r) in race.racers.withIndex()) {
+        for (i in race.racers.indices) {
+            val r = race.racers[i]
             val v = r.vehicle
             carPose(v, tmpP, tmpF)
             var fx = tmpF[0]; var fy = tmpF[1]; var fz = tmpF[2]
@@ -380,9 +406,9 @@ class GameScene(
             Mat.basis(mtx, rx, ry, rz, ux, uy, uz, fx, fy, fz, tmpP[0], tmpP[1], tmpP[2])
             val blink = v.resetFlash > 0f && ((time * 12).toInt() % 2 == 0)
             val kick = if (r.isPlayer) boostKick else 0f
-            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting) 1f + kick * 0.8f else 0f, time, blink)
+            cars[i].update(mtx, v.bodyPitch, v.bodyRoll, v.bodyBounce, v.steerAngle, v.wheelSpin, if (v.boosting || warming) 1f + kick * 0.8f else 0f, time, blink)
             // light trails from both rear corners (model +X maps to -right)
-            val heat = if (v.boosting && !blink) 1f else 0f
+            val heat = if (settings.effects != Level.OFF && v.boosting && !blink) 1f else 0f
             for (k in 0..1) {
                 val lx = if (k == 0) 0.6f else -0.6f; val ly = 0.55f; val lz = -1.9f
                 trails.push(i, k, tmpP[0] - rx * lx + ux * ly + fx * lz, tmpP[1] - ry * lx + uy * ly + fy * lz, tmpP[2] - rz * lx + uz * ly + fz * lz, heat)
@@ -392,7 +418,12 @@ class GameScene(
         knock.update()
         ambientFx(realDt)
         updateCamera(realDt)
-        val cr = camera.getLeftVector(FloatArray(3)); val cu = camera.getUpVector(FloatArray(3))
+        val cr = camera.getLeftVector(camLeft); val cu = camera.getUpVector(camUp)
+        if (warming) {
+            // one of each particle kind right in front of the camera (hidden by the loading screen)
+            add.spawn(look[0], look[1], look[2], 0f, 0f, 0f, 0.1f, 0.3f, 0.3f, 1f, 1f, 1f, 1f, force = true)
+            alpha.spawn(look[0], look[1], look[2], 0f, 0f, 0f, 0.1f, 0.3f, 0.3f, 1f, 1f, 1f, 1f, force = true)
+        }
         trails.update(eye[0], eye[1], eye[2])
         add.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
         alpha.update(realDt * race.timeScale, eye[0], eye[1], eye[2], -cr[0], -cr[1], -cr[2], cu[0], cu[1], cu[2])
@@ -405,7 +436,13 @@ class GameScene(
         hud.speedKmh = pv.speed * 3.6f; hud.boosting = pv.boosting
         hud.countdown = race.countdown; hud.phase = race.phase
         hud.flash = max(0f, hud.flash - realDt * 2f); hud.whoops = max(0f, hud.whoops - realDt)
-        for ((i, r) in race.racers.withIndex()) hud.progress[i] = (r.vehicle.progress / (race.laps * track.length)).coerceIn(0f, 1f)
+        for (i in race.racers.indices) hud.progress[i] = (race.racers[i].vehicle.progress / (race.laps * track.length)).coerceIn(0f, 1f)
+    }
+    private val camLeft = FloatArray(3); private val camUp = FloatArray(3)
+
+    companion object {
+        const val NEAR = 0.5; const val FAR = 3000.0
+        private val FIREWORK_COLOURS = arrayOf(floatArrayOf(4f, 1f, 1.5f), floatArrayOf(1f, 3f, 4f), floatArrayOf(4f, 3.5f, 0.8f), floatArrayOf(1.2f, 4f, 1.5f))
     }
 
     fun restart() {
@@ -420,5 +457,9 @@ class GameScene(
         tropics?.destroy()
         weather?.destroy(scene)
         grading?.let { view.colorGrading = null; engine.destroyColorGrading(it) }
+        // leave the view as the menus expect it: no race fog, boost vignette or jump-cam blur carried over
+        view.fogOptions = View.FogOptions()
+        view.vignetteOptions = View.VignetteOptions()
+        settings.setDof(view, false, 12f, camera)
     }
 }

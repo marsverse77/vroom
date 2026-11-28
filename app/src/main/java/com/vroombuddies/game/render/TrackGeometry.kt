@@ -103,6 +103,8 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
         }
         buildRamps(out)
         buildPads(out)
+        buildBoostGuides(out)
+        buildChargeGates(out)
         buildStart(Frame(), out)
         if (theme.ground != null) buildGround(out)
     }
@@ -149,6 +151,56 @@ class TrackGeometry(private val track: TrackPath, private val theme: Theme) {
             }
             out(m, TrackLayer.RAMP)
         }
+    }
+
+    private fun buildChargeGates(out: (MeshData, TrackLayer) -> Unit) {
+        val housing = MeshData()
+        val light = MeshData()
+        for (gate in track.chargeGates) {
+            val frame = track.frame(gate.s)
+            val x = frame.x + frame.rx * gate.x
+            val z = frame.z + frame.rz * gate.x
+            val yaw = atan2(frame.tx, frame.tz)
+            val pose = Mat.trs(x, frame.y + 0.08f, z, ry = yaw)
+            Prims.torus(housing, gate.halfWidth + 0.28f, 0.24f, Rgba.hex(0x27374e), pose, 8, 32, PI.toFloat())
+            // A crown of coloured diamonds marks the charge gate from around a bend.
+            for (i in 1..5) {
+                val angle = i * PI.toFloat() / 6f
+                val lateral = cos(angle) * (gate.halfWidth + .58f)
+                val gem = Mat.trs(x + frame.rx*lateral, frame.y + sin(angle)*(gate.halfWidth+.58f),
+                    z + frame.rz*lateral, ry=yaw, rz=angle-.78f)
+                Prims.box(light, .42f, .42f, .20f, Rgba.hex(if (i%2==0) theme.kerbs.first else 0xffd459), gem)
+            }
+            Prims.torus(light, gate.halfWidth, 0.10f, Rgba.hex(0xffbf4a), pose, 6, 32, PI.toFloat())
+        }
+        if (housing.iCount > 0) {
+            out(housing, TrackLayer.ARCH)
+            out(light, TrackLayer.ARCH_GLOW)
+        }
+    }
+
+    /** Three narrowing chevrons lead young drivers into the actual boost lane. */
+    private fun buildBoostGuides(out: (MeshData, TrackLayer) -> Unit) {
+        val guides = MeshData()
+        val frame = Frame()
+        val color = Rgba.hex(theme.kerbs.first)
+        fun vertex(s: Float, x: Float): Int {
+            track.frame(s, frame)
+            return guides.vertex(frame.x + frame.rx * x, track.groundHeight(s) + 0.12f,
+                frame.z + frame.rz * x, 0f, 1f, 0f, color)
+        }
+        for (pad in track.pads) for (step in 1..3) {
+            val tip = pad.s - pad.halfLength - step * 7f
+            val width = pad.halfWidth * (0.60f + step * 0.08f)
+            for (side in listOf(-1, 1)) {
+                val a = vertex(tip, pad.x)
+                val b = vertex(tip - 2f, pad.x + side * width)
+                val c = vertex(tip - 2.85f, pad.x + side * width)
+                val d = vertex(tip - 0.85f, pad.x)
+                guides.quadFacing(a, b, c, d)
+            }
+        }
+        if (guides.iCount > 0) out(guides, TrackLayer.ARCH_GLOW)
     }
 
     private fun buildPads(out: (MeshData, TrackLayer) -> Unit) {

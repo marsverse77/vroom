@@ -12,3 +12,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "VroomBuddies"
 include(":app")
+
+include(":ui-probe")
+project(":ui-probe").projectDir = file("tools/ui-probe")

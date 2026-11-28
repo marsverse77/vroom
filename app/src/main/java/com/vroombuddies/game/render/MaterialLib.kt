@@ -29,9 +29,6 @@ class MaterialLib(private val ctx: Context) {
 
     private class Spec(val name: String, val configure: (MaterialBuilder) -> MaterialBuilder, val source: String, val optional: Boolean = false)
 
-    // skinning, VSM and stereo variants are never used: skip them to make compiling 3x faster
-    private val variantFilter = 8 or 32 or 128
-
     private val specs = listOf(
         Spec("lit", { b ->
             b.shading(Shading.LIT).require(VertexAttribute.COLOR)
@@ -162,7 +159,6 @@ class MaterialLib(private val ctx: Context) {
                     .platform(Platform.MOBILE)
                     .targetApi(TargetApi.OPENGL)
                     .optimization(Optimization.PERFORMANCE)
-                    .variantFilter(variantFilter)
                     .material(spec.source.trimIndent())
                 val pkg = spec.configure(b).build()
                 check(pkg.isValid) { "material ${spec.name} failed to compile" }
@@ -191,5 +187,5 @@ class MaterialLib(private val ctx: Context) {
         water = opt("water"); postFx = opt("postFx")
     }
 
-    companion object { const val VERSION = "filament-1.81.0-v1" }
+    companion object { const val VERSION = "filament-1.81.0-full-variants-v2" }
 }

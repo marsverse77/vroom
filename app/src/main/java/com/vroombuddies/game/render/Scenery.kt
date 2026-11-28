@@ -105,7 +105,7 @@ object SceneryLibrary {
                         val y = 0.9f + row * 0.9f; val z = -row * 1.6f - 0.3f
                         Prims.box(m, 0.6f, 0.8f, 0.4f, c(shirts[r.int(shirts.size)]), Mat.trs(x, y + 0.4f, z))
                         Prims.sphere(m, 0.26f, c(if (r.f() < 0.5f) 0xffcc99 else 0x8d5524), Mat.trs(x, y + 1.05f, z), 6, 4)
-                        x += 0.75f + r.f() * 0.2f
+                        x += 1.85f + r.f() * 0.45f
                     }
                 }
                 // big light-up sign
@@ -135,7 +135,7 @@ object SceneryLibrary {
  * Where every scenery model goes, batched per 300 m cell into near (detailed) and far (simple) meshes.
  * Pure geometry with no GPU calls. [missing] lists ids that have no builder yet.
  */
-class SceneryLayout(private val track: TrackPath, private val theme: Theme, val cellSize: Float = 300f) {
+class SceneryLayout(private val track: TrackPath, private val theme: Theme, val cellSize: Float = 160f) {
     class Cell(val cx: Float, val cz: Float) {
         val near = MeshData(); val far = MeshData(); val glow = MeshData()
     }
@@ -146,6 +146,31 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
         val ix = floor(x / cellSize).toInt(); val iz = floor(z / cellSize).toInt()
         val key = (ix.toLong() shl 32) or (iz.toLong() and 0xffffffffL)
         return cells.getOrPut(key) { Cell((ix + 0.5f) * cellSize, (iz + 0.5f) * cellSize) }
+    }
+
+    // Landmarks share a stretch of the lap so children can recognise the route on lap two.
+    private val sectors = when (theme.name) {
+        "Sunny Meadow" -> listOf(setOf("windmill", "flower"), setOf("grandstand", "flagRow"), setOf("balloon"))
+        "Desert Canyon" -> listOf(setOf("rockArch", "cactus"), setOf("waterTower", "barrelCactus"), setOf("mesa"))
+        "Space Station" -> listOf(setOf("rocket", "beacon"), setOf("station", "satellite"), setOf("planet"))
+        "Neon City" -> listOf(setOf("building", "lamp"), setOf("neonSign", "trafficLight"), setOf("hydrant"))
+        "Snowy Peaks" -> listOf(setOf("snowFort", "snowman"), setOf("igloo", "penguin"), setOf("snowCabin", "sled"))
+        "Sunny Beach" -> listOf(setOf("umbrella", "beachBall"), setOf("lifeguardTower", "surfboards"), setOf("sandcastle", "crab"))
+        "Jungle Jam" -> listOf(setOf("tikiTotem", "fern"), setOf("jungleRuin", "bigLeaf"), setOf("parrot", "giantFlower"))
+        "Volcano Run" -> listOf(setOf("obsidian", "burntTree"), setOf("lavaPool", "lavaRock"), setOf("volcano"))
+        "Sweet Treats" -> listOf(setOf("candyCane", "lollipop"), setOf("bigCake", "cupcake"), setOf("iceCream", "donut"))
+        "Moon Base" -> listOf(setOf("dome", "antenna"), setOf("rover", "crater"), setOf("rocket", "beacon"))
+        "Autumn Woods" -> listOf(setOf("redBarn", "hayBale"), setOf("appleCart", "scarecrow"), setOf("pumpkin", "toadstool"))
+        "Rainbow Sky" -> listOf(setOf("cloudCastle", "skyStar"), setOf("rainbow", "cloudPuff"), setOf("balloon"))
+        "Frozen Lake" -> listOf(setOf("iceberg", "icePond"), setOf("iceSkater", "penguin"), setOf("snowFort", "igloo"))
+        "Pirate Cove" -> listOf(setOf("jollyFlag", "cannon"), setOf("chest", "anchor"), setOf("lantern", "beachHut"))
+        "Dino Valley" -> listOf(setOf("bigEgg", "fern"), setOf("dinoBuddy", "cycad"), setOf("longNeck"))
+        "Toy Town" -> listOf(setOf("toyBlocks", "pencil"), setOf("toyHouse", "teddy"), setOf("crayon", "toyBall"))
+        "Sunset Highway" -> listOf(setOf("diner", "roadSign"), setOf("billboard", "lamp"), setOf("waterTower"))
+        "Crystal Canyon" -> listOf(setOf("glowMushroom", "crystal"), setOf("spire"), setOf("beacon", "starBit"))
+        "Bubble Reef" -> listOf(setOf("clam", "anemone"), setOf("sunkenShip", "chest"), setOf("jellyfish", "fish"))
+        "Galaxy Grand Prix" -> listOf(setOf("ring", "beacon"), setOf("station", "rocket"), setOf("planet", "satellite"))
+        else -> emptyList()
     }
 
     fun place(): SceneryLayout {
@@ -160,16 +185,21 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
             val b = SceneryLibrary.builders[rule.id]
             if (b == null) { missing.add(rule.id); continue }
             val hi = b(0); val lo = b(1)
+            val sector = sectors.indexOfFirst { rule.id in it }
             var placed = 0; var tries = 0
             while (placed < rule.count && tries < rule.count * 20) {
                 tries++
                 val sc = rule.scaleMin + rng.f() * (rule.scaleMax - rule.scaleMin)
-                val ps = rng.f() * track.length
+                // Gather a few signature props per district. Leave the rest dispersed.
+                val staged = sector >= 0 && placed < minOf(8, (rule.count + 1) / 2)
+                val fraction = if (staged) (sector + 0.5f + (rng.f() - 0.5f) * 0.48f) / 3f else rng.f()
+                val ps = fraction * track.length
                 track.frame(ps, f)
                 val side = if (rng.f() < 0.5f) -1f else 1f
                 if (hi.trackside && abs(f.kappa) > 0.0025f) continue
                 val r = if (hi.trackside) 0.5f else hi.radius * sc
-                val dist = edge + r + rule.minDist + rng.f() * (rule.maxDist - rule.minDist)
+                val spread = (rule.maxDist - rule.minDist) * if (staged) 0.26f else 1f
+                val dist = edge + r + rule.minDist + rng.f() * spread
                 val x = f.x + f.rx * side * dist; val z = f.z + f.rz * side * dist
                 // keep clear of every part of the road
                 var ok = true
@@ -194,7 +224,7 @@ class SceneryLayout(private val track: TrackPath, private val theme: Theme, val 
 }
 
 class Scenery(private val engine: Engine, private val scene: Scene, private val mats: MaterialLib, private val track: TrackPath, private val theme: Theme) {
-    private class CellEnts(val cell: SceneryLayout.Cell) { var eNear = 0; var eFar = 0; var eGlow = 0 }
+    private class CellEnts(val cx: Float, val cz: Float) { var eNear = 0; var eFar = 0; var eGlow = 0; var tier = -1 }
     private val cells = ArrayList<CellEnts>()
     private val meshes = ArrayList<GpuMesh>()
     private val ents = ArrayList<Int>()
@@ -202,8 +232,7 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
     private lateinit var glowMi: MaterialInstance
     var missing: List<String> = emptyList()
 
-    fun build(windOn: Boolean) {
-        val layout = SceneryLayout(track, theme).place()
+    fun build(windOn: Boolean, layout: SceneryLayout) {
         missing = layout.missing
         litMi = mats.lit.createInstance().also {
             it.setParameter("baseColor", 1f, 1f, 1f, 1f); it.setParameter("roughness", 0.8f); it.setParameter("metallic", 0f)
@@ -211,7 +240,7 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
         }
         glowMi = mats.glow.createInstance().also { it.setParameter("color", 3f, 3f, 3f, 1f) }
         for (cell in layout.cells.values) {
-            val c = CellEnts(cell); cells.add(c)
+            val c = CellEnts(cell.cx, cell.cz); cells.add(c)
             if (cell.near.vCount > 0) c.eNear = make(cell.near, litMi, true)
             if (cell.far.vCount > 0) c.eFar = make(cell.far, litMi, false)
             if (cell.glow.vCount > 0) c.eGlow = make(cell.glow, glowMi, false)
@@ -227,16 +256,34 @@ class Scenery(private val engine: Engine, private val scene: Scene, private val 
 
     fun setWind(on: Boolean) = litMi.setParameter("wind", if (on) 1f else 0f)
 
-    /** Level of detail: near cells use the detailed batch, far cells the simple one. */
+    /**
+     * Level of detail: near cells use the detailed batch, far cells the simple one. A 60 m band between the
+     * switch-in and switch-out distances stops a cell flipping back and forth (visible popping) when the
+     * camera sits right on the boundary, and only cells that actually change are touched.
+     */
     fun updateLod(camX: Float, camZ: Float) {
         val rm = engine.renderableManager
-        for (c in cells) {
-            val d = hypot(c.cell.cx - camX, c.cell.cz - camZ)
-            val near = d < 520f
-            if (c.eNear != 0) rm.setLayerMask(rm.getInstance(c.eNear), 0xff, if (near) 0xff else 0)
-            if (c.eFar != 0) rm.setLayerMask(rm.getInstance(c.eFar), 0xff, if (near) 0 else 0xff)
+        for (i in cells.indices) {
+            val c = cells[i]
+            val dx = c.cx - camX
+            val dz = c.cz - camZ
+            val d2 = dx * dx + dz * dz
+            val nearLimit = if (c.tier == 0) 285f else 250f
+            val farLimit = if (c.tier == 2) 950f else 1040f
+            val tier = when {
+                d2 < nearLimit * nearLimit -> 0
+                d2 < farLimit * farLimit -> 1
+                else -> 2
+            }
+            if (tier == c.tier) continue
+            c.tier = tier
+            if (c.eNear != 0) rm.setLayerMask(rm.getInstance(c.eNear), 0xff, if (tier == 0) 0xff else 0)
+            if (c.eFar != 0) rm.setLayerMask(rm.getInstance(c.eFar), 0xff, if (tier == 1) 0xff else 0)
+            if (c.eGlow != 0) rm.setLayerMask(rm.getInstance(c.eGlow), 0xff, if (tier == 0) 0xff else 0)
         }
     }
+
+    private companion object { const val LOD_IN = 500f; const val LOD_OUT = 560f }
 
     fun destroy() {
         for (e in ents) { scene.remove(e); engine.destroyEntity(e) }

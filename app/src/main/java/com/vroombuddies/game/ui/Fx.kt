@@ -209,24 +209,19 @@ class HoldButton(ctx: Context, private val label: String, private val color: Int
 }
 
 /** Title plate: a dark slanted bar with a coloured speed stripe on its leading edge. */
-class BannerDrawable(private val color: Int, private val lean: Float = Ui.dp(16f)) : android.graphics.drawable.Drawable() {
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val path = Path()
-    private fun para(l: Float, t: Float, r: Float, b: Float) {
-        path.reset(); path.moveTo(l + lean, t); path.lineTo(r, t); path.lineTo(r - lean, b); path.lineTo(l, b); path.close()
-    }
+class BannerDrawable(private val color: Int) : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val face = RectF()
     override fun draw(c: Canvas) {
-        val b = bounds; val sh = Ui.dp(3f)
-        val l = b.left.toFloat(); val t = b.top.toFloat(); val r = b.right.toFloat(); val bt = b.bottom.toFloat() - sh
-        p.pathEffect = CornerPathEffect(Ui.dp(4f)); p.shader = null
-        p.color = 0x66000000; para(l, t + sh, r, bt + sh); c.drawPath(path, p)
-        p.shader = LinearGradient(0f, t, 0f, bt, 0xf02a2e37.toInt(), 0xf0121419.toInt(), Shader.TileMode.CLAMP)
-        para(l, t, r, bt); c.drawPath(path, p); p.shader = null
-        // speed stripe: two parallel slashes in the accent colour on the left
-        val w = Ui.dp(7f)
-        p.color = color; para(l, t, l + w + lean, bt); c.drawPath(path, p)
-        p.color = Ui.darken(color, 0.25f); para(l + w + Ui.dp(4f), t, l + w * 1.6f + Ui.dp(4f) + lean, bt); c.drawPath(path, p)
-        // top highlight
-        p.color = 0x44ffffff; p.pathEffect = null; c.drawRect(l + lean + w * 2, t, r - Ui.dp(4f), t + Ui.dp(1f), p)
+        face.set(bounds)
+        Ui.drawChunky(c,face,Ui.dp(16f),color,lip=Ui.dp(5f),outline=Ui.dp(2.2f),p=p)
+        val size = Ui.dp(3.6f)
+        for (side in 0..1) for (row in 0..2) for (col in 0..2) {
+            if ((row+col)%2 != 0) continue
+            val x = (if (side==0) face.left+Ui.dp(12f) else face.right-Ui.dp(23f)) + col*size
+            val y = face.centerY()-size*1.9f+row*size
+            p.color = 0xcfffffff.toInt(); c.drawRect(x,y,x+size,y+size,p)
+        }
     }
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
@@ -262,6 +257,55 @@ class TileDrawable(private val top: Int, private val mid: Int, private val botto
         p.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(0x00000000, 0x00000000, 0xcc000000.toInt()), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
         c.drawRoundRect(r, radius - o, radius - o, p); p.shader = null
         p.color = 0x55ffffff; c.drawRect(r.left + radius, r.top, r.right - radius, r.top + Ui.dp(1f), p)
+    }
+    override fun setAlpha(alpha: Int) {}
+    override fun setColorFilter(cf: ColorFilter?) {}
+    @Deprecated("Deprecated in Java") override fun getOpacity() = PixelFormat.TRANSLUCENT
+}
+
+/** Sample one illustrated course from the shared atlas. Inset the edges to avoid neighbouring tiles. */
+class CoursePostcard(ctx: Context, private val atlas: Bitmap, index: Int) : View(ctx) {
+    private val ink = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val frame = RectF()
+    private val rounded = Path()
+    private val source = Rect(index%5*atlas.width/5+2,index/5*atlas.height/4+2,
+        (index%5+1)*atlas.width/5-2,(index/5+1)*atlas.height/4-2)
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) {
+        val inset = Ui.dp(3f)
+        frame.set(inset,inset,w-inset,h-inset-Ui.dp(4f))
+        rounded.reset(); rounded.addRoundRect(frame,Ui.dp(10f),Ui.dp(10f),Path.Direction.CW)
+    }
+    override fun onDraw(c: Canvas) {
+        c.save(); c.clipPath(rounded)
+        val scale = max(frame.width()/source.width(),frame.height()/source.height())
+        c.translate(frame.centerX(),frame.centerY())
+        c.scale(scale,scale); c.translate(-source.exactCenterX(),-source.exactCenterY())
+        c.drawBitmap(atlas,source,source,ink); c.restore()
+    }
+}
+
+/** Oversized starting-flag switch, with a raised enamel face and a hand-drawn chequer. */
+class StartFlagDrawable : android.graphics.drawable.Drawable() {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val face = RectF()
+    private val flag = Path()
+    override fun draw(c: Canvas) {
+        val w=bounds.width().toFloat(); val h=bounds.height().toFloat()
+        if (w<=0f || h<=0f) return
+        c.save(); c.translate(bounds.left.toFloat(),bounds.top.toFloat())
+        face.set(w*0.025f,h*0.025f,w*0.985f,h*0.98f)
+        Ui.drawChunky(c,face,h*0.32f,0xff46b32a.toInt(),lip=h*0.13f,outline=Ui.dp(2.5f),p=p)
+        c.save(); c.translate(w*0.14f,h*0.40f); c.rotate(-12f)
+        val u=h*0.083f
+        p.strokeCap=Paint.Cap.ROUND; p.strokeWidth=u*0.74f; p.color=Ui.INK
+        c.drawLine(-u*0.25f,-u*1.8f,-u*0.25f,u*3.2f,p)
+        flag.reset(); flag.moveTo(0f,-u*1.8f); flag.cubicTo(u*2,-u*2.5f,u*3,-u,u*5,-u*1.8f)
+        flag.lineTo(u*5,u*1.3f); flag.cubicTo(u*3,u*2f,u*2,u*0.8f,0f,u*1.4f); flag.close()
+        p.color=Color.WHITE; c.drawPath(flag,p); c.save(); c.clipPath(flag); p.color=Ui.INK
+        for (i in 0..4) for (j in 0..4) if ((i+j)%2==0)
+            c.drawRect(i*u,(j-2)*u,(i+1)*u,(j-1)*u,p)
+        c.restore(); p.style=Paint.Style.STROKE; p.strokeWidth=u*0.32f
+        c.drawPath(flag,p); p.style=Paint.Style.FILL; c.restore(); c.restore()
     }
     override fun setAlpha(alpha: Int) {}
     override fun setColorFilter(cf: ColorFilter?) {}
