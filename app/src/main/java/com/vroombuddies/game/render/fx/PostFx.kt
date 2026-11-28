@@ -73,11 +73,13 @@ class PostFx(private val engine: Engine, material: Material?) {
         }
     }
 
+    private var targetWidth = 0
+    private var targetHeight = 0
+
     fun resize(w: Int, h: Int) {
         if (w == width && h == height) return
         width = w; height = h
         view.viewport = Viewport(0, 0, w, h)
-        releaseTarget()
     }
 
     private fun allocateTarget(material: MaterialInstance) {
@@ -87,12 +89,16 @@ class PostFx(private val engine: Engine, material: Material?) {
             .format(Texture.InternalFormat.RGBA8).usage(Texture.Usage.COLOR_ATTACHMENT or Texture.Usage.SAMPLEABLE).build(engine)
         val d = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
             .format(Texture.InternalFormat.DEPTH24).usage(Texture.Usage.DEPTH_ATTACHMENT).build(engine)
-        target = RenderTarget.Builder()
+        val next = RenderTarget.Builder()
             .texture(RenderTarget.AttachmentPoint.COLOR, c)
             .texture(RenderTarget.AttachmentPoint.DEPTH, d)
             .build(engine)
-        color = c; depth = d
+        // The sampler must stop referencing the previous color texture before it is destroyed.
         material.setParameter("scene", c, sampler)
+        releaseTarget()
+        target = next
+        color = c; depth = d
+        targetWidth = w; targetHeight = h
     }
 
     private fun releaseTarget() {
@@ -109,7 +115,10 @@ class PostFx(private val engine: Engine, material: Material?) {
             renderer.render(main)
             return
         }
-        if (target == null) allocateTarget(m)
+        if (target == null || targetWidth != width || targetHeight != height) {
+            main.renderTarget = null
+            allocateTarget(m)
+        }
         val rt = target
         if (main.renderTarget !== rt) main.renderTarget = rt
         m.setParameter("params", fx.blur, fx.rays, fx.boost, 0f)
