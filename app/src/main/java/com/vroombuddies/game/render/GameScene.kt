@@ -446,6 +446,11 @@ class GameScene(
     }
 
     fun profileGroup(mode: Int) {
+        view.isShadowingEnabled = settings.shadows != Level.OFF && mode != 5 && mode != 8
+        val bloom = view.bloomOptions
+        bloom.enabled = settings.bloom && mode != 6 && mode != 8
+        view.bloomOptions = bloom
+        view.isPostProcessingEnabled = mode != 7
         cars.forEach { it.includeInProfile(mode != 1) }
         scenery.includeInProfile(mode != 2)
         trackR.includeInProfile(mode != 3)

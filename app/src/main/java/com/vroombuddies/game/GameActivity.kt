@@ -143,7 +143,7 @@ class GameActivity : Activity(), MenuHost {
             samples = 0
         }
     }
-    private val modes = intArrayOf(0, 1, 0, 2, 0, 3, 0, 4, 0)
+    private val modes = intArrayOf(0, 5, 0, 6, 0, 7, 0, 8, 0)
     private var profileWindow = 0
     private var count = 0
     private var previousTime = 0L
