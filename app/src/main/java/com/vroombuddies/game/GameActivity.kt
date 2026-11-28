@@ -144,20 +144,20 @@ class GameActivity : Activity(), MenuHost {
         }
     }
     private val modes = intArrayOf(0, 1, 0, 2, 0, 3, 0, 4, 0)
-    private var window = 0
+    private var profileWindow = 0
     private var count = 0
     private var previousTime = 0L
     private val timings = LongArray(30)
     private fun profileGroup(g: GameScene, time: Long) {
-        if (window >= modes.size) return
-        if (count == 0) g.profileGroup(modes[window])
+        if (profileWindow >= modes.size) return
+        if (count == 0) g.profileGroup(modes[profileWindow])
         if (count >= 10) timings[count - 10] = (time - previousTime) / 1000
         previousTime = time
         count++
         if (count == 40) {
             timings.sort()
-            Log.i("Vroom", "FIXED_GRID group=${modes[window]} us50=${timings[15]} us95=${timings[28]} pixels=${surfaceW}x$surfaceH")
-            window++
+            Log.i("Vroom", "FIXED_GRID group=${modes[profileWindow]} us50=${timings[15]} us95=${timings[28]} pixels=${surfaceW}x$surfaceH")
+            profileWindow++
             count = 0
         }
     }
