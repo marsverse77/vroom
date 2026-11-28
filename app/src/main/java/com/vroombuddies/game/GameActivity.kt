@@ -116,14 +116,28 @@ class GameActivity : Activity(), MenuHost {
     private val submitIntervals = LongArray(60)
     private var lastSubmission = 0L
     private var samples = 0
-    private fun measureSubmission(nanos: Long) {
+    private var declined = 0
+    private var pacingSkips = 0
+    private val beginTimes = LongArray(60)
+    private val updateTimes = LongArray(60)
+    private val drawTimes = LongArray(60)
+    private fun measureSubmission(nanos: Long, begin: Long, update: Long, draw: Long, phase: RacePhase) {
         if (lastSubmission != 0L) {
             val elapsed = nanos - lastSubmission
+            beginTimes[samples] = begin / 1000
+            updateTimes[samples] = update / 1000
+            drawTimes[samples] = draw / 1000
             submitIntervals[samples++] = elapsed / 1000
             adaptSurface(elapsed)
         }
         lastSubmission = nanos
         if (samples == submitIntervals.size) {
+            beginTimes.sort()
+            updateTimes.sort()
+            drawTimes.sort()
+            Log.i("Vroom", "Frame profile us phase=$phase begin50=${beginTimes[30]} update50=${updateTimes[30]} draw50=${drawTimes[30]} update95=${updateTimes[56]} draw95=${drawTimes[56]} declined=$declined pacingSkips=$pacingSkips buffer=${surfaceW}x$surfaceH")
+            declined = 0
+            pacingSkips = 0
             submitIntervals.sort()
             Log.i("Vroom", "Frame intervals us median=${submitIntervals[30]} p95=${submitIntervals[56]} worst=${submitIntervals.last()}")
             samples = 0
@@ -344,7 +358,7 @@ class GameActivity : Activity(), MenuHost {
             resultShown = false; paused = false
             // draw a few hidden frames with every effect on (still behind the loading screen) so shaders,
             // shadow maps and post-processing buffers are all ready before the countdown appears
-            samples = 0; lastSubmission = 0L
+            samples = 0; lastSubmission = 0L; declined = 0; pacingSkips = 0
             warmFrames = WARM_FRAMES
             }
         }
@@ -415,10 +429,13 @@ class GameActivity : Activity(), MenuHost {
             if ((frames++ and 63) == 0) followRefreshRate()
             // frame pacing: on a fast screen that couldn't switch to the game's frame rate, draw on every Nth refresh
             val interval = settings.frameInterval
-            if (interval > 1 && (vsyncs++ % interval) != 0) return
+            if (interval > 1 && (vsyncs++ % interval) != 0) { pacingSkips++; return }
             if (!ready || (staticMenu && showroomDrawn && game == null)) return
             val sc = swapChain ?: return
-            if (!uiHelper.isReadyToRender || !renderer.beginFrame(sc, frameTimeNanos)) return
+            if (!uiHelper.isReadyToRender) return
+            val startBegin = System.nanoTime()
+            if (!renderer.beginFrame(sc, frameTimeNanos)) { declined++; return }
+            val startUpdate = System.nanoTime()
             val dt = if (lastNanos == 0L) 1f / 60f else ((frameTimeNanos - lastNanos) / 1e9f).coerceIn(0.001f, 0.05f)
             lastNanos = frameTimeNanos
             val g = game
@@ -446,9 +463,10 @@ class GameActivity : Activity(), MenuHost {
                 hud?.tick(dt); boostBtn?.tick(dt)
             } else showroom?.update(dt)
             run {
+                val startDraw = System.nanoTime()
                 postFx?.render(renderer, view, game?.post) ?: renderer.render(view)
                 renderer.endFrame()
-                if (g != null && warmFrames == 0 && !paused) measureSubmission(frameTimeNanos) else lastSubmission = 0L
+                if (g != null && warmFrames == 0 && !paused) measureSubmission(frameTimeNanos, startUpdate - startBegin, startDraw - startUpdate, System.nanoTime() - startDraw, g.hud.phase) else lastSubmission = 0L
                 if (g == null && !showroomDrawn) { showroomDrawn = true; Log.i("Vroom", "Showroom frame submitted") }
                 if (g != null && warmFrames == 0 && !raceDrawn) { raceDrawn = true; Log.i("Vroom", "Race frame submitted") }
             }

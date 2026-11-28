@@ -46,6 +46,7 @@ def measure(number):
             raise RuntimeError("Process exited on course " + str(number))
         intervals = re.findall(r"Frame intervals us median=(\d+) p95=(\d+) worst=(\d+)", logs)
         if len(intervals) >= 2:
+            print("COURSE_PROFILE", number, re.findall(r"Frame profile us ([^\n]+)", logs)[:2], flush=True)
             setup = re.search(r"Course ready in (\d+) ms", logs)
             row = dict(course=number, setup_ms=int(setup[1]) if setup else None,
                        frame_windows_us=[[int(v) for v in sample] for sample in intervals[:2]])
