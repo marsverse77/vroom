@@ -1,5 +1,6 @@
 package com.vroombuddies.game
 
+import com.vroombuddies.game.content.Knock
 import com.vroombuddies.game.content.Themes
 import com.vroombuddies.game.sim.*
 import org.junit.Assert.*
@@ -8,7 +9,7 @@ import org.junit.Test
 class RaceTimingTest {
     private fun newRace(): Race {
         val theme = Themes.all.first()
-        return Race(TrackPath(theme.shape), theme.gravity, 2, true, emptyList(),
+        return Race(TrackPath(theme.shape), theme.gravity, 2, true, Knock.kinds(theme.knock),
             VehicleParams(), 0, 0, emptyList(), listOf(0), theme.shape.seed)
     }
 

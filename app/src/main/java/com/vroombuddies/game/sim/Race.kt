@@ -104,9 +104,8 @@ class Race(
         updatePlaces()
     }
 
-    private fun driveInput(r: Racer, dt: Float, racing: Boolean) {
+    private fun driveInput(r: Racer, dt: Float) {
         val v = r.vehicle
-        if (!racing) return
         // boost button / AI boost
         if (r.isPlayer) {
             v.energy = min(100f, v.energy + 5f * dt)
