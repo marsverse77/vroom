@@ -73,18 +73,20 @@ class PostFx(private val engine: Engine, material: Material?) {
         }
     }
 
-    private var targetWidth = 0
-    private var targetHeight = 0
+    private var offscreenViewport = Viewport(0, 0, 1, 1)
+    private var screenViewport = Viewport(0, 0, 1, 1)
 
     fun resize(w: Int, h: Int) {
         if (w == width && h == height) return
         width = w; height = h
-        view.viewport = Viewport(0, 0, w, h)
+        screenViewport = Viewport(0, 0, w, h)
+        view.viewport = screenViewport
     }
 
     private fun allocateTarget(material: MaterialInstance) {
-        val w = width
-        val h = height
+        val scale = minOf(1f, kotlin.math.sqrt(320_000f / (width.toFloat() * height)))
+        val w = (width * scale).toInt().coerceAtLeast(1)
+        val h = (height * scale).toInt().coerceAtLeast(1)
         val c = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
             .format(Texture.InternalFormat.RGBA8).usage(Texture.Usage.COLOR_ATTACHMENT or Texture.Usage.SAMPLEABLE).build(engine)
         val d = Texture.Builder().width(w).height(h).levels(1).sampler(Texture.Sampler.SAMPLER_2D)
@@ -93,12 +95,10 @@ class PostFx(private val engine: Engine, material: Material?) {
             .texture(RenderTarget.AttachmentPoint.COLOR, c)
             .texture(RenderTarget.AttachmentPoint.DEPTH, d)
             .build(engine)
-        // The sampler must stop referencing the previous color texture before it is destroyed.
         material.setParameter("scene", c, sampler)
-        releaseTarget()
         target = next
         color = c; depth = d
-        targetWidth = w; targetHeight = h
+        offscreenViewport = Viewport(0, 0, w, h)
     }
 
     private fun releaseTarget() {
@@ -115,10 +115,7 @@ class PostFx(private val engine: Engine, material: Material?) {
             renderer.render(main)
             return
         }
-        if (target == null || targetWidth != width || targetHeight != height) {
-            main.renderTarget = null
-            allocateTarget(m)
-        }
+        if (target == null) allocateTarget(m)
         val rt = target
         if (main.renderTarget !== rt) main.renderTarget = rt
         m.setParameter("params", fx.blur, fx.rays, fx.boost, 0f)
@@ -126,7 +123,9 @@ class PostFx(private val engine: Engine, material: Material?) {
         m.setParameter("focus", fx.focusU, fx.focusV)
         m.setParameter("rayColor", fx.rayColor[0], fx.rayColor[1], fx.rayColor[2], 1f)
         m.setParameter("boostColor", fx.boostColor[0], fx.boostColor[1], fx.boostColor[2], 1f)
+        main.viewport = offscreenViewport
         renderer.render(main)
+        main.viewport = screenViewport
         renderer.render(view)
     }
 
